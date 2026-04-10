@@ -49,5 +49,30 @@ app = FastAPI(lifespan=lifespan)
 async def root():
     return {"message":"Hello World"}
 
+#路由中使用ORM
+# 需求: 查询功能的接口，查询图书 —> 依赖注入: 创建依赖项获取数据库会话 + Depends注入路由处理函数
+AsyncSessionLocal = async_sessionmaker(
+    bind=async_engine, # 绑定数据库引擎
+    class_=AsyncSession, # 指定会话类
+    expire_on_commit=False # 提交后会话不过期，不会重新查询数据库
+)
+
+async def get_database():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session # 返回数据库会话给理由处理函数
+            await session.commit() # 提交事务
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close() # 关闭会话
+
+@app.get("/book/books")
+async def get_book_list(db: AsyncSession = Depends(get_database)):
+    # 查询
+    result = await db.execute(select(Book))
+    book = result.scalars().all()
+    return book
 if __name__ == "__main__":
  uvicorn.run(app,host="127.0.0.1",port=8000)
