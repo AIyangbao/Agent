@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker,Async
 from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column
 import uvicorn
 import numpy as np
+from pydantic import BaseModel
 
 # 创建异步引擎
 ASYNC_DATABASE_URL = "mysql+aiomysql://root:15358810yang@localhost:3306/FastAPI_first?charset=utf8mb4"
@@ -69,7 +70,7 @@ async def get_database():
             await session.close() # 关闭会话
 
 @app.get("/book/books")
-async def get_book_list(db: AsyncSession = Depends(get_database)):
+async def get_book_list1(db: AsyncSession = Depends(get_database)):
     # 查询
     result = await db.execute(select(Book)) # 查询 ——> 返回一个ORM 对象
     #book = result.scalars().all() # 获取所有
@@ -106,5 +107,40 @@ async def get_count(db: AsyncSession = Depends(get_database)):
     result3 = await db.execute(select(func.avg(Book.price)))
     num = result3.scalar()
     return num
+
+@app.get("/book/get_book_list")
+async def get_book_list(
+    page: int = 1,
+    page_size: int =3,
+    db: AsyncSession = Depends(get_database)
+):
+    # (页码 - 1) * page_size
+    skip = (page - 1) * page_size
+    # offset 跳过的记录数 : limit 每页的记录数
+    stmt = select(Book).offset(skip).limit(page_size)
+    result = await db.execute(stmt)
+    books = result.scalars().all()
+    return books
+
+# 需求: 用户输入图书信息(id,书名、作者、价格、出版社) -> 新增
+# 用户输入 -> 参数 -> 请求体
+class BookBase(BaseModel):
+    id: int
+    bookname: str
+    author: str
+    price: float
+    publisher: str
+
+@app.post("/book/add_book")
+async def add_book(book: BookBase, db: AsyncSession = Depends(get_database)):
+    # ORM对象 -> add -> commit
+    book_obj = Book(**book.__dict__)
+    db.add(book_obj)
+    await db.commit()
+    return book
+
+
+
+
 if __name__ == "__main__":
  uvicorn.run(app,host="127.0.0.1",port=8000)
