@@ -97,5 +97,14 @@ async def get_search_book(db: AsyncSession = Depends(get_database)):
     result3 = await db.execute(select(Book).where(Book.id.in_(id_list)))
     book = result3.scalars().all()
     return book
+
+@app.get("/book/count")
+async def get_count(db: AsyncSession = Depends(get_database)):
+    # 聚合查询 select( func.方法名(模型类.属性))
+    result1 = await db.execute(select(func.count(Book.id)))
+    result2 = await db.execute(select(func.max(Book.price)))
+    result3 = await db.execute(select(func.avg(Book.price)))
+    num = result3.scalar()
+    return num
 if __name__ == "__main__":
  uvicorn.run(app,host="127.0.0.1",port=8000)
