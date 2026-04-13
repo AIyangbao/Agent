@@ -5,7 +5,7 @@ from sqlalchemy import DateTime,func,Float,select,String
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker,AsyncSession
 from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column
 import uvicorn
-
+import numpy as np
 
 # 创建异步引擎
 ASYNC_DATABASE_URL = "mysql+aiomysql://root:15358810yang@localhost:3306/FastAPI_first?charset=utf8mb4"
@@ -78,11 +78,24 @@ async def get_book_list(db: AsyncSession = Depends(get_database)):
     book = result.scalar_one_or_none()
     return book
 
-# 需求 ： 条件 价格大于等于200
+
 @app.get("/book/search_book")
 async def get_search_book(db: AsyncSession = Depends(get_database)):
-    result = await db.execute(select(Book).where(Book.price >=200))
-    books = result.scalars().all()
-    return books
+    # 需求 ： 条件 价格大于等于200
+    #result = await db.execute(select(Book).where(Book.price >=200))
+    #books = result.scalars().all()
+    #return books(
+    # 需求: 作者 以曾 开头 %_
+    # like() 模糊查询: % 任意个字符：_一个单个字符
+    result1 = await db.execute(select(Book).where((Book.author.like("曹_"))))
+
+    #& | ~ 与非
+    result2 = await db.execute(select(Book).where((Book.author.like("曹%")) | (Book.price>100)))
+    # in_() 包含
+    # 需求: 书籍id列表，数据库里面的id如果在书籍id列表里面就返回
+    id_list=[1,3,5,7]
+    result3 = await db.execute(select(Book).where(Book.id.in_(id_list)))
+    book = result3.scalars().all()
+    return book
 if __name__ == "__main__":
  uvicorn.run(app,host="127.0.0.1",port=8000)
