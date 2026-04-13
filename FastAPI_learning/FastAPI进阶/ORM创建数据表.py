@@ -168,6 +168,21 @@ async def update_book(book_id: int, data: BookUpdate,db: AsyncSession = Depends(
     await db.commit()
     return db_book
 
+@app.delete("/book/delete_book/{book_id}")
+async def delete_book(book_id:int, db: AsyncSession =Depends(get_database)):
+    # 先查再删 提交
+    db_book = await db.get(Book,book_id)
+
+    if db_book is None:
+        raise HTTPException(
+            status_code=404,
+            detail="查无此书"
+        )
+    await db.delete(db_book)
+    await db.commit()
+    return {"msg":"删除图书成功"}
+
+
 
 
 if __name__ == "__main__":
