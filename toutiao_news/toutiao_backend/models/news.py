@@ -11,7 +11,7 @@ class Base(DeclarativeBase):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        dafault=datetime.now,
+        default=datetime.now,
         onupdate=datetime.now,
         comment="更新时间"
     )

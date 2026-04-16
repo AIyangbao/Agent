@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker,AsyncS
 from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column
 
 # 创建异步引擎
-ASYNC_DATABASE_URL = "mysql+aiomysql://root:15358810yang@localhost:3306/news_app?charset=utf8bm4"
+ASYNC_DATABASE_URL = "mysql+aiomysql://root:15358810yang@localhost:3306/news_app?charset=utf8mb4"
 async_engine = create_async_engine(
     ASYNC_DATABASE_URL,
     echo=True, # 输出SQL日志
