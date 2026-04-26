@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import news,users,favorite
+from routers import news,users,favorite,history
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -21,5 +21,6 @@ async def root():
 app.include_router(news.router)
 app.include_router(users.router)
 app.include_router(favorite.router)
+app.include_router(history.router)
 if __name__ == "__main__":
     uvicorn.run(app,host="127.0.0.1",port=8000)
