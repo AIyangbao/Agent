@@ -35,7 +35,7 @@ async def set_cache(key:str,value: Any,expire:int = 3600):
    try:
       if isinstance(value,(dict,list)):
          # 转字符串再存
-         value = json.dumps(value,ensure_ascill=False) # 中文正常保存
+         value = json.dumps(value,ensure_ascii=False) # 中文正常保存
       await redis_client.setex(key,expire,value)
       return None
    except Exception as e:
