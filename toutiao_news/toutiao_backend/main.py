@@ -3,8 +3,12 @@ from routers import news,users,favorite,history
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
+from utils.exception_handlers import register_exception_handlers
 # 允许的来源
 app = FastAPI()
+
+# 注册异常处理器
+register_exception_handlers
 
 app.add_middleware(
     CORSMiddleware,
