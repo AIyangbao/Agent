@@ -1,0 +1,21 @@
+# Python 缓存文件（你要忽略的核心）
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 临时数据文件
+chat_history/
+chroma_db/
+data/
+
+# 环境变量文件
+.env
+.env.local
+
+# IDE 配置文件
+.idea/
+.vscode/
+
+# 日志文件
+*.log
