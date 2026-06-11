@@ -13,6 +13,7 @@ redis_client = redis.Redis(
 )
 
 # 设置 和 读取 (字符串 和 列表或字典)"[{}]"
+
 # 读取: 字符串
 async def get_cache(key:str):
     try:
