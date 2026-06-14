@@ -1,0 +1,4 @@
+venv/
+.workbuddy/
+__pycache__/
+node_modules/
