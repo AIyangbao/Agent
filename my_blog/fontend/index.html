@@ -1,18 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>二次元技术宅小窝</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <video autoplay muted loop playsinline id="bg-video">
-        <source src="流萤-飞萤的余辉 firefly HSR by时桐七夜.mp4" type="video/mp4">
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  </head>
+  <body>
+    <!-- 背景视频 -->
+    <video
+      class="bg-video"
+      autoplay loop muted playsinline
+      poster=""
+    >
+      <source src="/流萤-飞萤的余辉 firefly HSR by时桐七夜.mp4" type="video/mp4" />
     </video>
-    <div class="content">
-        <h1>欢迎来到我的主页</h1>
-        <p>从零开始搭建属于自己的小网站</p>
-    </div>
-</body>
+    <!-- 视频遮罩 -->
+    <div class="bg-overlay"></div>
+    <!-- Vue 挂载点 -->
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>

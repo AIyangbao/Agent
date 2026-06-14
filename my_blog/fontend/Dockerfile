@@ -1,8 +1,12 @@
-# 用超轻量nginx镜像
+# 阶段1：构建 Vue 项目
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# 阶段2：Nginx 托管静态文件
 FROM nginx:alpine
-
-# 把当前目录所有前端文件(html/css)复制到nginx网页目录
-COPY . /usr/share/nginx/html/
-
-# 暴露80端口
+COPY --from=builder /app/dist /usr/share/nginx/html/
 EXPOSE 80
