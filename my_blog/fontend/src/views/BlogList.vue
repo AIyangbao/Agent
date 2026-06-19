@@ -30,49 +30,118 @@
           @click="$router.push('/posts/' + post.id)"
         />
       </template>
-      <div v-if="!filteredPosts.length" class="empty">没有找到相关文章 ∅</div>
+      <div v-if="!filteredPosts.length && !loading" class="empty">没有找到相关文章 ∅</div>
+      <div v-if="loading" class="empty">加载中...</div>
     </div>
 
-    <div class="pagination">
-      <span class="page-num active">1</span>
-      <span class="page-num">2</span>
-      <span class="page-num">→</span>
+    <div class="pagination" v-if="totalPages > 1">
+      <span
+        v-for="p in totalPages"
+        :key="p"
+        class="page-num"
+        :class="{ active: p === page }"
+        @click="goPage(p)"
+      >{{ p }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { posts } from '../data/mock'
+import { ref, computed, onMounted } from 'vue'
+import { fetchPosts } from '../api/posts'
 import BlogCard from '../components/BlogCard.vue'
 
 const keyword = ref('')
 const currentTag = ref('all')
+const page = ref(1)
+const pageSize = 10
+const loading = ref(false)
+const total = ref(0)
+const posts = ref([])
 
 const allTags = computed(() => {
   const set = new Set()
-  posts.forEach(p => p.tags.forEach(t => set.add(t)))
+  posts.value.forEach(p => (p.tags || []).forEach(t => set.add(t)))
   return ['all', ...set]
 })
 
-const filteredPosts = ref([...posts])
+const filteredPosts = computed(() => {
+  const kw = keyword.value.toLowerCase()
+  return posts.value.filter(p => {
+    const tagMatch = currentTag.value === 'all' || (p.tags || []).includes(currentTag.value)
+    const kwMatch = !kw || p.title.toLowerCase().includes(kw) || (p.excerpt || '').toLowerCase().includes(kw)
+    return tagMatch && kwMatch
+  })
+})
+
+const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1)
 
 function setTag(tag) {
   currentTag.value = tag
-  filter()
+}
+
+function goPage(p) {
+  page.value = p
+  loadPosts()
 }
 
 function filter() {
-  const kw = keyword.value.toLowerCase()
-  filteredPosts.value = posts.filter(p => {
-    const tagMatch = currentTag.value === 'all' || p.tags.includes(currentTag.value)
-    const kwMatch = !kw || p.title.toLowerCase().includes(kw) || p.excerpt.toLowerCase().includes(kw)
-    return tagMatch && kwMatch
-  })
+  // 前端搜索，不需要重新请求
 }
+
+async function loadPosts() {
+  loading.value = true
+  try {
+    const params = { page: page.value, pageSize }
+    if (currentTag.value !== 'all') {
+      params.tag = currentTag.value
+    }
+    const data = await fetchPosts(params)
+    // 后端 join 查询返回的每条 blog 带有 tag.name，同 id 会出现多次，需要去重+合并标签
+    posts.value = formatPosts(data.list || [])
+    total.value = data.total || 0
+  } catch (e) {
+    console.error('加载文章失败', e)
+    posts.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+function formatPosts(rows) {
+  const map = new Map()
+  for (const row of rows) {
+    // mappings() 返回 {"Blog": {...}, "name": "..."}，提取内层 Blog 对象
+    const blog = row.Blog || row
+    if (!map.has(blog.id)) {
+      map.set(blog.id, {
+        id: blog.id,
+        title: blog.title,
+        content: blog.content || '',
+        create_time: blog.create_time,
+        views: blog.views || 0,
+        tags: []
+      })
+    }
+    // 收集标签名（带 tagId 筛选时 row.name 存在；查全部时无此字段）
+    if (row.name && !map.get(blog.id).tags.includes(row.name)) {
+      map.get(blog.id).tags.push(row.name)
+    }
+  }
+  return Array.from(map.values()).map(blog => ({
+    ...blog,
+    excerpt: blog.content.length > 100 ? blog.content.slice(0, 100) + '...' : '',
+    date: blog.create_time ? blog.create_time.slice(0, 10) : ''
+  }))
+}
+
+onMounted(() => {
+  loadPosts()
+})
 </script>
 
 <style scoped>
+/* 原有样式保持不变 */
 .page { padding: 80px 1rem 3rem; }
 .page-header { text-align: center; margin-bottom: 2.5rem; }
 .page-header h2 {

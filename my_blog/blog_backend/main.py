@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import blogs
+from routers import blogs,users
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from utils.exception_handlers import register_exception_handlers
@@ -23,6 +23,8 @@ async def root():
     return {"message":"Hellow World"}
 # 挂载路由/注册路由
 app.include_router(blogs.router)
+app.include_router(users.router)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

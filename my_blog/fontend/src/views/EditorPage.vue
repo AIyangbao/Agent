@@ -51,13 +51,15 @@
 <script setup>
 import { ref, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { posts } from '../data/mock'
 import { useUserStore } from '../store'
 import { createPost } from '../api/posts'
 
 const router = useRouter()
 const toast = inject('toast')
 const user = useUserStore()
+
+// 标签名 → 标签ID 映射（需与数据库 tag 表一致，后续可改为接口获取）
+const TAG_MAP = { 'Python': 1, 'AI': 2, 'Vue': 3, 'FastAPI': 4, 'Docker': 5, '其他': 6 }
 
 const title = ref('')
 const content = ref('')
@@ -97,9 +99,9 @@ async function publish() {
   if (!tags.length) tags.push('其他')
 
   try {
-    const res = await createPost({ title: t, content: c, tags })
-    // 后端返回成功后，也更新本地 mock 列表（后备）
-    posts.unshift({ ...res, date: new Date().toISOString().slice(0, 10), views: 0, author: user.username })
+    // 将标签名转换为标签ID
+    const tagIds = tags.map(t => TAG_MAP[t]).filter(id => id != null)
+    const res = await createPost({ title: t, content: c, user_id: 1, tag_ids: tagIds })
     title.value = ''
     content.value = ''
     tag.value = ''

@@ -5,9 +5,16 @@
 const BASE = '/api'
 
 async function request(url, options = {}) {
+  // 从 localStorage 读取 token，加到请求头
+  const token = localStorage.getItem('blog_token')
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers
+  }
   const config = {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options
+    ...options,
+    headers
   }
   if (config.body && typeof config.body === 'object') {
     config.body = JSON.stringify(config.body)
@@ -15,7 +22,7 @@ async function request(url, options = {}) {
   const res = await fetch(`${BASE}${url}`, config)
   const json = await res.json()
   if (!res.ok || json.code !== 200) {
-    throw new Error(json.detail || json.msg || '请求失败')
+    throw new Error(json.detail || json.message || '请求失败')
   }
   return json.data ?? json
 }

@@ -33,21 +33,22 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { posts } from '../data/mock'
+import { ref, onMounted } from 'vue'
+import { fetchPosts } from '../api/posts'
 
-const totalPosts = posts.length
+const totalPosts = ref(0)
+const totalTags = 6   // Python, AI, Vue, Docker, FastAPI, 其他
+const totalViews = ref(0)
 
-const totalTags = computed(() => {
-  const all = new Set()
-  posts.forEach(p => p.tags.forEach(t => all.add(t)))
-  return all.size
-})
-
-const totalViews = computed(() => {
-  const sum = posts.reduce((s, p) => s + p.views, 0)
-  if (sum >= 1000) return (sum / 1000).toFixed(1) + 'k'
-  return sum
+onMounted(async () => {
+  try {
+    const data = await fetchPosts({ pageSize: 1 })
+    totalPosts.value = data.total || 0
+    // 视图统计暂用 total（等后端加 views 字段再替换）
+    totalViews.value = data.total || 0
+  } catch (e) {
+    console.error('获取统计数据失败', e)
+  }
 })
 </script>
 

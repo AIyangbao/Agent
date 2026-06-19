@@ -1,9 +1,8 @@
 from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker,AsyncSession
-from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column
+from config.settings import settings
 
-ASYNC_DATABASE_URL = "mysql+aiomysql://root:15358810yang@localhost:3306/blog_db?charset=utf8mb4"
 async_engine = create_async_engine(
-    ASYNC_DATABASE_URL,
+    settings.ASYNC_DATABASE_URL,
     echo=True, # 输出SQL日志
     pool_size=10, # 设置连接池活跃的连接数
     max_overflow=20, # 允许额外的连接数

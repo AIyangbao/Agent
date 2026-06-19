@@ -8,76 +8,110 @@
         </div>
         <h1 class="article-title">{{ post.title }}</h1>
         <div class="article-meta">
-          <span>✍️ {{ post.author }}</span>
           <span>📅 {{ post.date }}</span>
           <span>👁 {{ post.views }} 次阅读</span>
         </div>
+        <div class="article-actions" v-if="user.isLoggedIn">
+          <button class="btn-action btn-delete" @click.stop="confirmDelete">🗑 删除</button>
+        </div>
       </div>
       <div class="article-divider"></div>
-      <div class="article-body" v-html="mdToHtml(post.content)"></div>
+      <div class="article-body" v-html="post.content"></div>
 
-      <CommentSection :list="postComments" @add="addComment" />
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div class="modal-overlay" v-if="showDeleteConfirm" @click.self="cancelDelete">
+      <div class="modal-box">
+        <p class="modal-text">确定要删除 <strong>《{{ post.title }}》</strong> 吗？</p>
+        <p class="modal-hint">此操作不可撤销</p>
+        <div class="modal-btns">
+          <button class="btn-cancel" @click="cancelDelete" :disabled="deleting">取消</button>
+          <button class="btn-danger" @click="handleDelete" :disabled="deleting">
+            {{ deleting ? '删除中...' : '确认删除' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="page empty-page" v-else>
+  <div class="page empty-page" v-else-if="!loading">
     <p>文章不存在或已删除</p>
     <button class="btn-outline" @click="$router.push('/posts')">返回列表</button>
+  </div>
+  <div class="page empty-page" v-else>
+    <p>加载中...</p>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { posts, comments, tagClassMap } from '../data/mock'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { fetchPostById, deletePost } from '../api/posts'
 import { useUserStore } from '../store'
-import CommentSection from '../components/CommentSection.vue'
 import { inject } from 'vue'
 
-const props = defineProps({ id: String })
+const route = useRoute()
+const router = useRouter()
 const toast = inject('toast')
 const user = useUserStore()
+const post = ref(null)
+const loading = ref(true)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
-const post = computed(() => posts.find(p => p.id === parseInt(props.id)))
-
-const localComments = ref(JSON.parse(JSON.stringify(comments)))
-const postComments = computed(() => localComments.value[props.id] || [])
-
-function addComment(text) {
-  if (!localComments.value[props.id]) localComments.value[props.id] = []
-  const now = new Date()
-  const time = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
-  localComments.value[props.id].unshift({
-    id: Date.now(),
-    user: user.username,
-    text,
-    time
-  })
-}
+onMounted(async () => {
+  loading.value = true
+  try {
+    const data = await fetchPostById(route.params.id)
+    // 后端返回 { blog: {...}, tags: [...] }
+    const blog = data.blog || data
+    const tags = data.tags || []
+    post.value = {
+      id: blog.id,
+      title: blog.title,
+      content: blog.content,
+      tags: tags,
+      date: blog.create_time ? blog.create_time.slice(0, 10) : '',
+      views: blog.views || 0
+    }
+  } catch (e) {
+    console.error('加载文章失败', e)
+    post.value = null
+  } finally {
+    loading.value = false
+  }
+})
 
 function tagClass(tag) {
-  return (tagClassMap[tag] || '').toLowerCase()
+  const map = { Python: 'python', AI: 'ai', Vue: 'vue', Docker: 'docker', FastAPI: 'fastapi' }
+  return (map[tag] || '').toLowerCase()
 }
 
-function mdToHtml(md) {
-  return md
-    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-      `<pre><code class="lang-${lang}">${esc(code.trim())}</code></pre>`)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
-    .replace(/^---$/gm, '<hr>')
-    .replace(/\\`/g, '`')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/^(?!<[hupbli]|<\/[hupbli]|<block|<pre)(.+)$/gm, '<p>$1</p>')
+function confirmDelete() {
+  showDeleteConfirm.value = true
 }
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+async function handleDelete() {
+  deleting.value = true
+  try {
+    await deletePost(post.value.id)
+    if (toast) toast.success('删除成功')
+    router.push('/posts')
+  } catch (e) {
+    if (toast) toast.error(e.message || '删除失败')
+  } finally {
+    deleting.value = false
+    showDeleteConfirm.value = false
+  }
+}
+
+function cancelDelete() {
+  showDeleteConfirm.value = false
+}
 </script>
 
 <style scoped>
+/* 原有样式保持不变 */
 .page { padding: 80px 1rem 4rem; }
 .article-wrap { max-width: 780px; margin: 0 auto; }
 .article-back {
@@ -139,5 +173,41 @@ function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
   color: var(--text); font-size: 14px; cursor: pointer; transition: all 0.25s;
 }
 .btn-outline:hover { background: rgba(167,139,250,0.1); border-color: var(--primary); }
+
+/* 操作按钮 */
+.article-actions { display: flex; gap: 0.6rem; margin-top: 0.6rem; }
+.btn-action {
+  padding: 0.35rem 0.9rem; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer;
+  transition: all 0.25s;
+}
+.btn-delete:hover { border-color: #f87171; color: #f87171; background: rgba(248,113,113,0.08); }
+
+/* 确认弹窗 */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.modal-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.8rem; max-width: 400px; width: 90%;
+  text-align: center;
+}
+.modal-text { font-size: 15px; color: var(--text); margin-bottom: 0.4rem; }
+.modal-text strong { color: var(--primary); }
+.modal-hint { font-size: 12px; color: var(--text-dim); margin-bottom: 1.2rem; }
+.modal-btns { display: flex; gap: 0.8rem; justify-content: center; }
+.btn-cancel {
+  padding: 0.45rem 1.4rem; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); font-size: 13px; cursor: pointer;
+}
+.btn-danger {
+  padding: 0.45rem 1.4rem; border-radius: 6px; border: none;
+  background: #f87171; color: #fff; font-size: 13px; cursor: pointer;
+  transition: opacity 0.25s;
+}
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger:not(:disabled):hover { opacity: 0.85; }
 @media (max-width: 640px) { .article-body { padding: 1.25rem; } }
 </style>

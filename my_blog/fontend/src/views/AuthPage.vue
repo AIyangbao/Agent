@@ -84,8 +84,12 @@ async function handleLogin() {
   if (!username || !password) { toast('请填写完整信息', 'error'); return }
   loading.value = true
   try {
-    await apiLogin(username, password)
+    const res = await apiLogin(username, password)
     user.login(username)
+    // 存储 JWT token
+    if (res && res.access_token) {
+      localStorage.setItem('blog_token', res.access_token)
+    }
     toast(`欢迎回来，${username} ✨`, 'success')
     setTimeout(() => router.push('/posts'), 800)
   } catch (e) {
@@ -102,8 +106,12 @@ async function handleRegister() {
   if (password !== confirm) { toast('两次密码不一致', 'error'); return }
   loading.value = true
   try {
-    await apiRegister(username, password)
+    const res = await apiRegister(username, password)
     user.login(username)
+    // 存储 JWT token
+    if (res && res.access_token) {
+      localStorage.setItem('blog_token', res.access_token)
+    }
     toast(`注册成功，欢迎 ${username} 🎉`, 'success')
     setTimeout(() => router.push('/posts'), 800)
   } catch (e) {
