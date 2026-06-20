@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.git
+.gitignore
+venv
+.venv
+*.md
+API_DOCUMENTATION.md
+Docker部署指南.md
