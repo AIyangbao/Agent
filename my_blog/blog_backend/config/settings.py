@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     DB_NAME: str = os.getenv("DB_NAME")
     # JWT
     JWT_PWD: str = os.getenv("JWT_PWD")
+    # Redis
+    REDIS_HOST: str = os.getenv("REDIS_HOST")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT"))
+    REDIS_DB: int = int(os.getenv("REDIS_DB"))
     # 拼接异步数据库连接URL
     @property
     def ASYNC_DATABASE_URL(self) -> str:
