@@ -46,8 +46,7 @@ async def add(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    blog.user_id = current_user.id
-    blog = await add_blog(db,blog)
+    blog = await add_blog(db,blog,current_user.id)
     return success_response(
         message="添加博客成功",
         data=blog
@@ -55,7 +54,15 @@ async def add(
 
 #软删除博客接口
 @router.delete("/delete")
-async def delete(id:int = Query(...),db:AsyncSession = Depends(get_db)):
+async def delete(id:int = Query(...),
+                 current_user: User = Depends(get_current_user),
+                 db:AsyncSession = Depends(get_db)):
+    blog = await get_blog_detail(db,id)
+    if blog.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="您没有权限删除此文章"
+        )
     await delete_blog(db,id)
     return success_response(
         message="删除博客成功"
@@ -63,7 +70,17 @@ async def delete(id:int = Query(...),db:AsyncSession = Depends(get_db)):
 
 #修改博客接口
 @router.put("/update")
-async def update(id: int ,blog: BlogUpdate,db:AsyncSession = Depends(get_db)):
+async def update(id: int ,
+                 blog: BlogUpdate,
+                 db:AsyncSession = Depends(get_db),
+                 current_user: User = Depends(get_current_user),
+                 ):
+    blog_data = await get_blog_detail(db,id)
+    if blog_data.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="你没有权限修改此文章"
+        )
     result = await update_blog(db,id,blog)
     return success_response(
         message="修改博客成功",

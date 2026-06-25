@@ -21,7 +21,6 @@ async def create_user(db: AsyncSession, user_data: UserRequest):
     hashed_pwd = get_hash_password(user_data.password)
     user = User(username=user_data.username, password=hashed_pwd)
     db.add(user)
-    await db.commit()
     await db.refresh(user)
     return user
 
@@ -42,6 +41,5 @@ async def update_user(db: AsyncSession,user:User,old_password:str,new_password:s
  hashed_new_pwd = get_hash_password(new_password)
  user.password = hashed_new_pwd
  db.add(user)
- await db.commit()
  await db.refresh(user)
  return True    

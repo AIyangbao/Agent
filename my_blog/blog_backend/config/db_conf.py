@@ -3,7 +3,7 @@ from config.settings import settings
 
 async_engine = create_async_engine(
     settings.ASYNC_DATABASE_URL,
-    echo=True, # 输出SQL日志
+    echo=False, # 输出SQL日志
     pool_size=10, # 设置连接池活跃的连接数
     max_overflow=20, # 允许额外的连接数
 )

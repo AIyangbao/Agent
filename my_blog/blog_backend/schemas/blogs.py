@@ -1,18 +1,17 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 from datetime import datetime
 from typing import Optional, List
 
 
 class BlogCreate(BaseModel):
-    title: str
-    content: str
-    user_id: int
+    title: str = Field(...,min_length=1,max_length=200,description="标题")
+    content: str = Field(...,min_length=1,max_length=50000,description="内容")
     tag_ids: Optional[List[int]] = None
 
 
 class BlogUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
+    title: str = Field(...,min_length=1,max_length=200,description="标题")
+    content: str = Field(...,min_length=1,max_length=50000,description="内容")
 
 
 class BlogResponse(BaseModel):
@@ -20,7 +19,7 @@ class BlogResponse(BaseModel):
     title: str
     content: str
     user_id: int
-    tags: List[str]
+    tags_name: List[str]
 
     class Config:
         from_attributes = True
