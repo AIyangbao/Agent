@@ -5,6 +5,7 @@ import os
 # 加载.env文件
 load_dotenv()
 
+
 class Settings(BaseSettings):
     # 数据库
     DB_HOST: str = os.getenv("DB_HOST")
@@ -18,10 +19,14 @@ class Settings(BaseSettings):
     REDIS_HOST: str = os.getenv("REDIS_HOST")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT"))
     REDIS_DB: int = int(os.getenv("REDIS_DB"))
+    # DEBUG
+    DEBUG: bool = os.getenv("DEBUG_MODE")
+
     # 拼接异步数据库连接URL
     @property
     def ASYNC_DATABASE_URL(self) -> str:
         return f"mysql+asyncmy://{self.DB_USER}:{self.DB_PWD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
+
 
 # 全局单例配置
 settings = Settings()

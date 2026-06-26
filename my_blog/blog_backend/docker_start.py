@@ -1,4 +1,5 @@
 """Docker 启动脚本：等待 MySQL → 初始化数据库 → 启动 FastAPI"""
+
 import asyncio
 import subprocess
 import sys
@@ -9,6 +10,7 @@ from time import sleep
 async def check_mysql():
     """直接用 asyncmy 检测 MySQL"""
     import asyncmy
+
     conn = await asyncmy.connect(
         host=os.getenv("DB_HOST", "mysql"),
         port=int(os.getenv("DB_PORT", "3306")),
@@ -28,7 +30,7 @@ def wait_for_mysql(max_retries=30):
             print("MySQL 连接成功!")
             return True
         except Exception as e:
-            print(f"  [{i+1}/{max_retries}] {e}")
+            print(f"  [{i + 1}/{max_retries}] {e}")
         sleep(2)
 
     print("ERROR: MySQL 连接超时!")

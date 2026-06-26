@@ -1,12 +1,12 @@
-from typing import Optional
 
-from pydantic import BaseModel,Field,ConfigDict
+from pydantic import BaseModel, Field
+
 
 class UserRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=1, max_length=200)
+
 
 class UserChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
-
+    old_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=1, max_length=200)
