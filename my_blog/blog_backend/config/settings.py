@@ -16,11 +16,11 @@ class Settings(BaseSettings):
     # JWT
     JWT_PWD: str = os.getenv("JWT_PWD")
     # Redis
-    REDIS_HOST: str = os.getenv("REDIS_HOST")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT"))
-    REDIS_DB: int = int(os.getenv("REDIS_DB"))
+    REDIS_HOST: str = os.getenv("REDIS_HOST","localhost")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT","6379"))
+    REDIS_DB: int = int(os.getenv("REDIS_DB","0"))
     # DEBUG
-    DEBUG: bool = os.getenv("DEBUG_MODE")
+    DEBUG: bool = os.getenv("DEBUG_MODE","False") == "True"
 
     # 拼接异步数据库连接URL
     @property

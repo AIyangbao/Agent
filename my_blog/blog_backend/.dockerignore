@@ -7,5 +7,9 @@ __pycache__
 venv
 .venv
 *.md
+tests/
+test.db
+pytest.ini
+.pytest_vache
 API_DOCUMENTATION.md
 Docker部署指南.md

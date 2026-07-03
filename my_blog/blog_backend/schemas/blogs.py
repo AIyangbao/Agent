@@ -9,8 +9,8 @@ class BlogCreate(BaseModel):
 
 
 class BlogUpdate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200, description="标题")
-    content: str = Field(..., min_length=1, max_length=50000, description="内容")
+    title: Optional[str] = Field(..., min_length=1, max_length=200, description="标题")
+    content: Optional[str] = Field(..., min_length=1, max_length=50000, description="内容")
 
 
 class BlogResponse(BaseModel):

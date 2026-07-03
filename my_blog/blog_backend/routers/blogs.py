@@ -53,7 +53,8 @@ async def add(
     db: AsyncSession = Depends(get_db),
 ):
     create_blog = await add_blog(db, blog, current_user.id)
-    return success_response(message="添加博客成功", data=create_blog)
+    result = await get_blog_detail(db,create_blog.id)
+    return success_response(message="添加博客成功", data=result)
 
 
 # 软删除博客接口
