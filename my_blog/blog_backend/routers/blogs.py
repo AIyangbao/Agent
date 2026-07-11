@@ -23,13 +23,14 @@ router = APIRouter(prefix="/api/blogs", tags=["blogs"])
 @router.get("/list_blogs")
 async def list_blogs(
     tagId: Optional[int] = Query(None),
+    keyword: Optional[str] = Query(None,description="搜索关键词"),
     page: int = 1,
     pageSize: int = Query(10, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     offset = (page - 1) * pageSize
-    rows = await get_blog_list(db, tagId, offset, pageSize)
-    total = await get_list_count(db, tagId)
+    rows = await get_blog_list(db, tagId, offset, pageSize,keyword)
+    total = await get_list_count(db, tagId,keyword)
     data = {"list": rows, "total": total}
     return success_response(message="获取博客列表成功", data=data)
 

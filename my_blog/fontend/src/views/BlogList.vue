@@ -8,7 +8,8 @@
     <div class="list-controls">
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input v-model="keyword" placeholder="搜索文章标题或关键词..." @input="filter" />
+        <input v-model="keyword" placeholder="搜索文章标题或内容..." />
+        <span v-if="keyword" class="search-clear" @click="clearSearch">✕</span>
       </div>
       <div class="tag-filters">
         <button
@@ -19,6 +20,10 @@
           @click="setTag(tag)"
         >{{ tag === 'all' ? '全部' : tag }}</button>
       </div>
+    </div>
+
+    <div class="search-info" v-if="keyword.trim()">
+      搜索「<strong>{{ keyword }}</strong>」找到 {{ total }} 篇文章
     </div>
 
     <div class="cards-grid">
@@ -47,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { fetchPosts } from '../api/posts'
 import BlogCard from '../components/BlogCard.vue'
 
@@ -59,22 +64,30 @@ const loading = ref(false)
 const total = ref(0)
 const posts = ref([])
 
+let searchTimer = null
+
 const allTags = computed(() => {
   const set = new Set()
   posts.value.forEach(p => (p.tags || []).forEach(t => set.add(t)))
   return ['all', ...set]
 })
 
+// 关键词搜索交给后端，前端只做标签过滤
 const filteredPosts = computed(() => {
-  const kw = keyword.value.toLowerCase()
-  return posts.value.filter(p => {
-    const tagMatch = currentTag.value === 'all' || (p.tags || []).includes(currentTag.value)
-    const kwMatch = !kw || p.title.toLowerCase().includes(kw) || (p.excerpt || '').toLowerCase().includes(kw)
-    return tagMatch && kwMatch
-  })
+  if (currentTag.value === 'all') return posts.value
+  return posts.value.filter(p => (p.tags || []).includes(currentTag.value))
 })
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1)
+
+// 防抖 300ms：输入停顿后才调后端，避免每次按键都发请求
+watch(keyword, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    loadPosts()
+  }, 300)
+})
 
 function setTag(tag) {
   currentTag.value = tag
@@ -85,19 +98,20 @@ function goPage(p) {
   loadPosts()
 }
 
-function filter() {
-  // 前端搜索，不需要重新请求
+function clearSearch() {
+  keyword.value = ''
+  page.value = 1
+  loadPosts()
 }
 
 async function loadPosts() {
   loading.value = true
   try {
     const params = { page: page.value, pageSize }
-    if (currentTag.value !== 'all') {
-      params.tag = currentTag.value
+    if (keyword.value.trim()) {
+      params.keyword = keyword.value.trim()
     }
     const data = await fetchPosts(params)
-    // 后端 join 查询返回的每条 blog 带有 tag.name，同 id 会出现多次，需要去重+合并标签
     posts.value = formatPosts(data.list || [])
     total.value = data.total || 0
   } catch (e) {
@@ -111,7 +125,6 @@ async function loadPosts() {
 function formatPosts(rows) {
   const map = new Map()
   for (const row of rows) {
-    // mappings() 返回 {"Blog": {...}, "name": "..."}，提取内层 Blog 对象
     const blog = row.Blog || row
     if (!map.has(blog.id)) {
       map.set(blog.id, {
@@ -123,7 +136,6 @@ function formatPosts(rows) {
         tags: []
       })
     }
-    // 收集标签名（带 tagId 筛选时 row.name 存在；查全部时无此字段）
     if (row.name && !map.get(blog.id).tags.includes(row.name)) {
       map.get(blog.id).tags.push(row.name)
     }
@@ -164,6 +176,13 @@ onMounted(() => {
 .search-wrap input:focus { border-color: var(--border-accent); }
 .search-wrap input::placeholder { color: var(--text-dim); }
 .search-icon { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 15px; pointer-events: none; }
+.search-clear {
+  position: absolute; right: 0.8rem; top: 50%; transform: translateY(-50%);
+  color: var(--text-dim); font-size: 14px; cursor: pointer; transition: color 0.2s; user-select: none;
+}
+.search-clear:hover { color: var(--text); }
+.search-info { max-width: 860px; margin: 0 auto 1rem; font-size: 14px; color: var(--text-muted); }
+.search-info strong { color: var(--primary); }
 .tag-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 .tag-btn {
   padding: 0.4rem 0.9rem; border-radius: 20px;

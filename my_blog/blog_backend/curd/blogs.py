@@ -8,42 +8,37 @@ from typing import Optional
 
 # 根据指定标签查询博客（含标签名，返回字典列表）
 async def get_blog_list(
-    db: AsyncSession, tag_id: Optional[int] = None, skip: int = 0, limit: int = 10
+    db: AsyncSession, tag_id: Optional[int] = None, skip: int = 0, limit: int = 10,keyword: Optional[str] = None,
 ):
-    if tag_id is None:
-        query = (
+    query = (
             select(Blog, tag.name)
             .outerjoin(Blog_tags, Blog.id == Blog_tags.blog_id)
             .outerjoin(tag, tag.id == Blog_tags.tag_id)
             .where(Blog.is_delete == False)
-            .offset(skip)
-            .limit(limit)
-            .order_by(Blog.create_time.desc())
         )
-    else:
-        query = (
-            select(Blog, tag.name)
-            .join(Blog_tags, Blog.id == Blog_tags.blog_id)
-            .join(tag, tag.id == Blog_tags.tag_id)
-            .where(Blog_tags.tag_id == tag_id, Blog.is_delete == False)
-            .offset(skip)
-            .limit(limit)
-            .order_by(Blog.create_time.desc())
+    if tag_id is not None:
+        query = query.where(Blog_tags.tag_id == tag_id)
+    if keyword:
+        kw = f"%{keyword}%"
+        query = query.where(
+            Blog.title.like(kw) | Blog.content.like(kw)
         )
+    query = query.offset(skip).limit(limit).order_by(Blog.create_time.desc())
     result = await db.execute(query)
     blogs = result.mappings().all()
     return blogs
 
 
 # 获取指定标签博客总量
-async def get_list_count(db: AsyncSession, tag_id: Optional[int] = None):
-    if tag_id is None:
-        query = select(func.count(Blog.id)).where(Blog.is_delete == False)
-    else:
-        query = (
-            select(func.count(Blog.id))
-            .join(Blog_tags, Blog.id == Blog_tags.blog_id)
-            .where(Blog_tags.tag_id == tag_id, Blog.is_delete == False)
+async def get_list_count(db: AsyncSession, tag_id: Optional[int] = None,keyword: Optional[str] = None):
+    query = select(func.count(Blog.id)).where(Blog.is_delete == False)
+    if tag_id is not None:
+        query = query.join(Blog_tags, Blog.id == Blog_tags.blog_id).where(
+            Blog_tags.tag_id == tag_id, Blog.is_delete == False)
+    if keyword:
+        kw = f"%{keyword}%"
+        query = query.where(
+            Blog.title.like(kw) | Blog.content.like(kw)
         )
     result = await db.execute(query)
     return result.scalar_one()

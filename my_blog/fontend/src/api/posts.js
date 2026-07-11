@@ -7,6 +7,7 @@ import { get, post, del, put } from './request'
 export function fetchPosts(params = {}) {
   const qs = new URLSearchParams()
   if (params.tag) qs.set('tagId', params.tag)
+  if (params.keyword) qs.set('keyword', params.keyword)
   if (params.page) qs.set('page', params.page)
   if (params.pageSize) qs.set('pageSize', params.pageSize)
   return get(`/blogs/list_blogs?${qs.toString()}`)
