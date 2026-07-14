@@ -1,5 +1,6 @@
 venv/
 .workbuddy/
+.env/
 __pycache__/
 node_modules/
 docker-compose.yml
