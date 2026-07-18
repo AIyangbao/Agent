@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
-from routers import blogs, users,ai
+from routers import musics,blogs, users,ai
 from fastapi.middleware.cors import CORSMiddleware
 from utils.exception_handlers import register_exception_handlers
 
@@ -29,7 +29,7 @@ async def root():
 app.include_router(blogs.router)
 app.include_router(users.router)
 app.include_router(ai.router)
-
+app.include_router(musics.router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -10,6 +10,5 @@ venv
 tests/
 test.db
 pytest.ini
-.pytest_vache
-API_DOCUMENTATION.md
+.pytest_cache
 Docker部署指南.md
