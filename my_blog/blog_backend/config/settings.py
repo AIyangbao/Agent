@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     REDIS_DB: int = int(os.getenv("REDIS_DB","0"))
     # DEBUG
     DEBUG: bool = os.getenv("DEBUG_MODE","False") == "True"
+    # AI
+    DASHSCOPE_API_KEY: str = os.getenv("DASHSCOPE_API_KEY","")
+    QWEN_MODEL: str = os.getenv("QWEN_MODEL","qwen-plus")
 
     # 拼接异步数据库连接URL
     @property
