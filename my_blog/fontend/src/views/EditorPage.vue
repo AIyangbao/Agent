@@ -121,58 +121,60 @@ async function publish() {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;
 }
-.editor-header h2 { font-size: 1.35rem; font-weight: 600; color: var(--text); }
+.editor-header h2 { font-size: 1.35rem; font-weight: 700; color: var(--text); }
 .editor-actions { display: flex; gap: 0.6rem; }
 .editor-card {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.5rem; backdrop-filter: blur(12px);
-  display: flex; flex-direction: column; gap: 1rem;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg); padding: 1.5rem;
+  box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1rem;
 }
 .editor-title {
-  width: 100%; padding: 0.75rem 1rem; border-radius: 8px;
-  border: 1px solid var(--border); background: rgba(10, 6, 25, 0.6);
-  color: var(--text); font-size: 20px; font-weight: 600;
-  outline: none; transition: border-color 0.25s;
+  width: 100%; padding: 0.75rem 1rem; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: var(--bg-body);
+  color: var(--text); font-size: 20px; font-weight: 700;
+  outline: none; transition: all var(--transition);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.03);
 }
-.editor-title:focus { border-color: var(--border-accent); }
+.editor-title:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
 .editor-title::placeholder { color: var(--text-dim); }
 .editor-meta-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .editor-meta-row select, .editor-meta-row input {
-  flex: 1; min-width: 140px; padding: 0.55rem 0.9rem; border-radius: 8px;
-  border: 1px solid var(--border); background: rgba(10, 6, 25, 0.6);
-  color: var(--text); font-size: 13px; outline: none; transition: border-color 0.25s;
+  flex: 1; min-width: 140px; padding: 0.55rem 0.9rem; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: var(--bg-body);
+  color: var(--text); font-size: 13px; outline: none; transition: all var(--transition);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.03);
 }
-.editor-meta-row select:focus, .editor-meta-row input:focus { border-color: var(--border-accent); }
+.editor-meta-row select:focus, .editor-meta-row input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16,185,129,0.08); }
 .editor-toolbar {
   display: flex; gap: 0.3rem; flex-wrap: wrap;
-  padding: 0.5rem 0; border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0; border-bottom: 1px solid var(--border-strong);
 }
 .toolbar-btn {
-  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
-  border-radius: 6px; border: none; background: transparent;
-  color: var(--text-muted); font-size: 14px; cursor: pointer; transition: all 0.25s; font-weight: 600;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; border: none; background: transparent;
+  color: var(--text-muted); font-size: 14px; cursor: pointer; transition: all var(--transition); font-weight: 700;
 }
-.toolbar-btn:hover { background: rgba(167,139,250,0.15); color: var(--primary); }
+.toolbar-btn:hover { background: var(--primary-bg); color: var(--primary-dark); }
 .editor-content {
-  width: 100%; min-height: 400px; padding: 1rem; border-radius: 8px;
-  border: 1px solid var(--border); background: rgba(10, 6, 25, 0.6);
+  width: 100%; min-height: 400px; padding: 1rem; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: var(--bg-body);
   color: var(--text); font-size: 15px; font-family: 'Fira Code', monospace;
-  line-height: 1.75; outline: none; resize: vertical; transition: border-color 0.25s;
+  line-height: 1.75; outline: none; resize: vertical; transition: all var(--transition);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.03);
 }
-.editor-content:focus { border-color: var(--border-accent); }
+.editor-content:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16,185,129,0.08); }
 .editor-content::placeholder { color: var(--text-dim); }
 
 .btn-primary {
   padding: 0.5rem 1.4rem; border-radius: 24px; border: none;
-  background: linear-gradient(90deg, var(--primary-dark), #9333ea);
-  color: white; font-size: 14px; font-weight: 600; cursor: pointer;
-  transition: all 0.25s;
+  background: var(--primary); color: white; font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all var(--transition); box-shadow: 0 2px 10px rgba(5,150,105,0.25);
 }
-.btn-primary:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.btn-primary:hover { transform: translateY(-1px); background: var(--primary-dark); box-shadow: 0 4px 14px rgba(5,150,105,0.35); }
 .btn-outline {
   padding: 0.5rem 1.1rem; border-radius: 24px;
-  border: 1px solid var(--border-accent); background: transparent;
-  color: var(--text); font-size: 14px; cursor: pointer; transition: all 0.25s;
+  border: 1px solid var(--border-strong); background: transparent;
+  color: var(--text-secondary); font-size: 14px; cursor: pointer; transition: all var(--transition); font-weight: 500;
 }
-.btn-outline:hover { background: rgba(167,139,250,0.1); border-color: var(--primary); }
+.btn-outline:hover { background: var(--bg-body); border-color: var(--primary); color: var(--primary); }
 </style>

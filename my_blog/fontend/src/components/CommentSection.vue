@@ -40,7 +40,7 @@ const props = defineProps({ list: Array })
 const emit = defineEmits(['add'])
 
 const user = useUserStore()
-const toast = inject('toast')
+const toast = inject('toast', (msg) => console.warn('[toast]', msg))
 const text = ref('')
 
 function submit() {
