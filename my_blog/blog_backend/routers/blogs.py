@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException,Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.db_conf import get_db
+import html
+from datetime import datetime
 from curd.blogs import (
     get_blog_list,
     get_list_count,
@@ -97,3 +99,47 @@ async def update(
         )
     result = await update_blog(db, id, blog)
     return success_response(message="修改博客成功", data=result)
+
+# RSS 订阅源(公开, 无需登录)
+@router.get('/rss')
+async def blog_rss(
+    limit: int = Query(20,le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await get_blog_list(db,None,0,limit)
+    site = "https://blog.fireflyai.site"
+    now = datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0800")
+    items = []
+    for row in rows:
+        b = row["Blog"]
+        title = html.escape(b.title)
+        link = f"{site}/posts/{b.id}"
+        desc = html.escape((b.content or "")[:300])
+        pub = (
+            b.create_time.strftime("%a, %d %b %Y %H:%M:%S +0800")
+            if b.create_time
+            else now
+        )
+        items.append(
+            f'    <item>\n'
+            f'      <title>{title}</title>\n'
+            f'      <link>{link}</link>\n'
+            f'      <guid>{link}</guid>\n'
+            f'      <pubDate>{pub}</pubDate>\n'
+            f'      <description>{desc}</description>\n'
+            f'    </item>'
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0">\n'
+        '  <channel>\n'
+        '    <title>技术宅小窝博客</title>\n'
+        f'    <link>{site}</link>\n'
+        '    <description>个人技术博客，记录学习与项目心得</description>\n'
+        '    <language>zh-CN</language>\n'
+        f'    <lastBuildDate>{now}</lastBuildDate>\n'
+        f'{chr(10).join(items)}\n'
+        '  </channel>\n'
+        '</rss>'
+    )
+    return Response(content=xml, media_type="application/rss+xml")
