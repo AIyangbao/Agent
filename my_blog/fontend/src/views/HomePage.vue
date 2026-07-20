@@ -33,13 +33,13 @@
             <a href="https://github.com/AIyangbao" target="_blank" class="soc-icon" title="GitHub">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
             </a>
-            <a href="mailto:sufeng@example.com" class="soc-icon" title="Email">
+            <a href="mailto:194564638@qq.com" class="soc-icon" title="Email">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             </a>
             <a href="https://blog.fireflyai.site" target="_blank" class="soc-icon" title="博客">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>
-            <a href="#" class="soc-icon" title="RSS" onclick="return false;">
+            <a href="/api/blogs/rss" target="_blank" class="soc-icon" title="RSS订阅" rel="noopener">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
             </a>
           </div>
@@ -870,7 +870,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, reactive, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchPosts, fetchPostById, deletePost, createPost } from '../api/posts'
-import { chatWithAIStream } from '../api/ai'
+import { chatWithAIStream, fetchAIHistory, clearAIHistory } from '../api/ai'
 import { useUserStore } from '../store'
 import CommentSection from '../components/CommentSection.vue'
 import { renderMarkdown } from '../utils/markdown.js'
@@ -1014,8 +1014,8 @@ function playSong(index) {
 }
 
 function togglePlay() {
-  if (!currentSong.value) {
-    playSong(0)
+  if (!currentSong.value || !audio.src) {
+    playSong(currentIndex.value)
     return
   }
   if (audio.paused) {
@@ -1126,6 +1126,21 @@ const aiQuickQuestions = [
   '解释一下 Docker 的核心概念',
 ]
 
+// 进入 AI 页时拉取持久化历史（后端未就绪/未登录时静默失败，不影响现有体验）
+async function loadAIHistory() {
+  try {
+    const history = await fetchAIHistory(50)
+    if (Array.isArray(history) && history.length) {
+      aiMessages.value = history.map(m => ({
+        role: m.role,
+        content: m.content,
+      }))
+    }
+  } catch (e) {
+    /* 静默：演示模式/未登录时无需报错 */
+  }
+}
+
 // AI 发送消息（流式）
 async function aiSendMessage(text) {
   const msg = (text || aiInput.value).trim()
@@ -1210,6 +1225,8 @@ async function aiScrollBottom() {
 
 function aiClearChat() {
   aiMessages.value = []
+  // 同步清空后端持久化历史（失败静默，本地已清空）
+  clearAIHistory()
 }
 
 // ========== 写文章编辑器 ==========
@@ -1568,6 +1585,12 @@ onMounted(() => {
   loadData()
   if (isDetailPage.value) loadDetail()
   fetchMusicList()
+  loadAIHistory()
+})
+
+// 切到 AI 页时（如登录后进入）补拉历史，覆盖 onMounted 时尚未登录的情况
+watch(isAIPage, (val) => {
+  if (val) loadAIHistory()
 })
 
 // 监听路由变化（同组件导航 query 变化不会重新挂载，需监听 fullPath）

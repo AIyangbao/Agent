@@ -90,3 +90,41 @@ export async function chatWithAIStream(message, history = [], onToken) {
     }
   }
 }
+
+/**
+ * 拉取当前登录用户的 AI 对话历史（后端持久化）
+ * 兼容后端返回 {code,data:[...]} 或直接数组
+ * @param {number} limit 最多返回条数
+ * @returns {Promise<Array<{role:string, content:string}>>}
+ */
+export async function fetchAIHistory(limit = 50) {
+  const token = localStorage.getItem('blog_token')
+  if (!token) return []
+  try {
+    const resp = await fetch(`/api/ai/history?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!resp.ok) return []
+    const data = await resp.json()
+    const list = Array.isArray(data) ? data : (data.data || [])
+    return list
+  } catch (e) {
+    return []
+  }
+}
+
+/**
+ * 清空当前登录用户的 AI 对话历史（后端持久化）
+ */
+export async function clearAIHistory() {
+  const token = localStorage.getItem('blog_token')
+  if (!token) return
+  try {
+    await fetch('/api/ai/history', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch (e) {
+    /* 静默失败，清空本地即可 */
+  }
+}
