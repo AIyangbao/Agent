@@ -4,7 +4,7 @@ WORKDIR /app
 # 先复制 package.json，利用层缓存
 COPY package.json ./
 # 安装依赖
-RUN npm install
+RUN npm install --registry=https://registry.npmmirror.com
 # 复制源代码
 COPY . .
 # 构建生产版本，输出到 dist/

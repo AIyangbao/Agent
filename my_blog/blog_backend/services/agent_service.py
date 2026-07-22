@@ -66,8 +66,8 @@ class AgentService:
                 
                 messages.append(ToolMessage(content=result,tool_call_id=tc["id"]))
         return "抱歉,处理超时,请简化问题后重试"
-    async def chat_stream(self, message: str, history: list[dict] | None = None):
-        messages = self._build_messages(message, history or [])
+    async def chat_stream(self, message: str, history: list[dict] | None = None,rag_context: str | None = None):
+        messages = self._build_messages(message, history or [],rag_context)
         tool_schemas = self._build_tool_schemas()
 
         for _ in range(self.MAX_ITERATIONS):
@@ -92,14 +92,26 @@ class AgentService:
 
 
     
-    def _build_messages(self,message: str, history: list[dict]) -> list:
-        messages = [SystemMessage(content=SYSTEM_PROMPT)]
+    def _build_messages(self,message: str, history: list[dict],rag_context: str | None = None) -> list:
+        system_content = SYSTEM_PROMPT
+        if rag_context: # 只有检索到内容注入
+            system_content += (
+                "\n\n---- 以下是与用户问题相关的博客文章片段,"
+                "回答时请优先基于这些内容,并在结尾注明参考来源 ----\n"
+                + rag_context
+            )
+        messages = [SystemMessage(content=system_content)]
 
-        for h in history[-10:]:
-            if h.get("role") == "user":
-                messages.append(HumanMessage(content=h["content"]))
-            elif h.get("role") in ("ai","assistant"):
-                messages.append(AIMessage(content=h["content"]))
+        # 添加历史对话
+        for msg in history:
+            role = msg.get("role","")
+            content = msg.get("content","")
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            elif role == "assistant" or role == "ai":
+                messages.append(AIMessage(content=content))
+        
+        # 添加当前用户消息
         messages.append(HumanMessage(content=message))
         return messages
     

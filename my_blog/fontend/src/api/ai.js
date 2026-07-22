@@ -24,7 +24,7 @@ export function chatWithAI(message, history = []) {
  * @param {Array} history
  * @param {(token: string) => void} onToken 每收到一段文本触发
  */
-export async function chatWithAIStream(message, history = [], onToken) {
+export async function chatWithAIStream(message, history = [], onToken, onCitations) {
   const token = localStorage.getItem('blog_token')
 
   // 1) 网络层错误（后端没起 / 断网）→ NETWORK
@@ -77,6 +77,7 @@ export async function chatWithAIStream(message, history = [], onToken) {
         try {
           const json = JSON.parse(payload)
           if (json.reply) onToken(json.reply)
+          if (json.citations && onCitations) onCitations(json.citations)
           if (json.error) {
             const err = new Error(json.error)
             err.code = 'STREAM'

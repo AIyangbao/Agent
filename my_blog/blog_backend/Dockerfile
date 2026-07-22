@@ -8,7 +8,7 @@ WORKDIR /app
 
 # 不需要 gcc！asyncmy 用预编译 Wheel 安装，秒级完成
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 复制项目代码
 COPY . .

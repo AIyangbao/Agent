@@ -52,6 +52,18 @@
               <div v-else-if="msg.role === 'assistant'" class="markdown-body" v-html="renderMarkdown(msg.content)"></div>
               <!-- 用户消息纯文本 -->
               <div v-else class="user-text">{{ msg.content }}</div>
+              <!-- RAG 参考来源 -->
+              <div v-if="msg.role === 'assistant' && msg.citations && msg.citations.length" class="msg-citations">
+                <span class="cites-label">📚 参考来源</span>
+                <a
+                  v-for="(c, ci) in msg.citations"
+                  :key="ci"
+                  :href="c.link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="cite-item"
+                >{{ c.title }}<span class="cite-sim">相关度 {{ Math.max(0, Math.round((1 - c.distance / 2) * 100)) }}%</span></a>
+              </div>
             </div>
           </div>
         </div>
@@ -129,7 +141,7 @@ async function sendMessage(text) {
   await scrollBottom()
 
   // 预留 assistant 占位消息，流式过程中逐 token 追加
-  const assistantMsg = reactive({ role: 'assistant', content: '', streaming: true })
+  const assistantMsg = reactive({ role: 'assistant', content: '', streaming: true, citations: null })
   messages.value.push(assistantMsg)
   loading.value = true
 
@@ -140,10 +152,17 @@ async function sendMessage(text) {
       .map(m => ({ role: m.role, content: m.content }))
 
     // 流式接收，每收到一段就追加并滚动到底部
-    await chatWithAIStream(msg, history, (token) => {
-      assistantMsg.content += token
-      scrollBottom()
-    })
+    await chatWithAIStream(
+      msg,
+      history,
+      (token) => {
+        assistantMsg.content += token
+        scrollBottom()
+      },
+      (citations) => {
+        assistantMsg.citations = citations
+      },
+    )
 
     apiOnline.value = true
     statusText.value = '已连接'
@@ -413,6 +432,26 @@ onMounted(() => {
   border: 1px solid var(--border-strong); padding: 0.4rem 0.65rem; text-align: left;
 }
 .markdown-body :deep(th) { background: var(--bg-body); font-weight: 600; color: var(--text); }
+
+/* ---- RAG 参考来源 ---- */
+.msg-citations {
+  margin-top: 0.6rem; padding-top: 0.6rem;
+  border-top: 1px dashed var(--border-strong);
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+}
+.cites-label {
+  font-size: 12px; color: var(--text-muted); font-weight: 600;
+  margin-right: 0.1rem;
+}
+.cite-item {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.3rem 0.7rem; border-radius: 12px;
+  background: var(--primary-bg); border: 1px solid var(--border-accent);
+  color: var(--primary-dark); font-size: 12.5px; text-decoration: none;
+  transition: all 0.2s; max-width: 100%;
+}
+.cite-item:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.cite-sim { font-size: 11px; opacity: 0.7; font-weight: 500; }
 
 /* ---- 动画 ---- */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

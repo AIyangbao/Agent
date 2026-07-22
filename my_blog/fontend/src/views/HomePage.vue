@@ -317,6 +317,17 @@
                   <div class="msg-content">
                     <div v-if="msg.role === 'assistant' && msg.streaming" class="user-text" style="white-space:pre-wrap">{{ msg.content }}</div>
                     <div v-else-if="msg.role === 'assistant'" class="markdown-body" v-html="renderMarkdown(msg.content)"></div>
+                    <!-- RAG 引用来源（站内跳转，环境自适应：本地测跳本地、线上跳线上） -->
+                    <div v-if="msg.role === 'assistant' && msg.citations && msg.citations.length" class="rag-citations">
+                      <span class="cit-label">📎 参考来源：</span>
+                      <router-link
+                        v-for="(c, ci) in msg.citations"
+                        :key="ci"
+                        :to="citPath(c.link)"
+                        class="cit-link"
+                        :title="'相似度 ' + ((1 - c.distance) * 100).toFixed(0) + '%'"
+                      >{{ c.title }}</router-link>
+                    </div>
                     <div v-else class="user-text">{{ msg.content }}</div>
                   </div>
                 </div>
@@ -867,7 +878,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, reactive, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, reactive, nextTick, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchPosts, fetchPostById, deletePost, createPost } from '../api/posts'
 import { chatWithAIStream, fetchAIHistory, clearAIHistory } from '../api/ai'
@@ -877,6 +888,7 @@ import { renderMarkdown } from '../utils/markdown.js'
 
 const route = useRoute()
 const $router = useRouter()
+const toast = inject('toast')
 const user = useUserStore()
 const isLoggedIn = computed(() => user.isLoggedIn)
 
@@ -1128,6 +1140,9 @@ const aiQuickQuestions = [
 
 // 进入 AI 页时拉取持久化历史（后端未就绪/未登录时静默失败，不影响现有体验）
 async function loadAIHistory() {
+  // 已有消息说明是页面切换回来（如点了引用链接跳详情再返回），
+  // 不覆盖内存中的 citations 等实时数据——后端持久化的历史不含 citations
+  if (aiMessages.value.length) return
   try {
     const history = await fetchAIHistory(50)
     if (Array.isArray(history) && history.length) {
@@ -1151,19 +1166,27 @@ async function aiSendMessage(text) {
   aiAutoResize()
   await aiScrollBottom()
 
-  const assistantMsg = reactive({ role: 'assistant', content: '', streaming: true })
-  aiMessages.value.push(assistantMsg)
-  aiLoading.value = true
+    const assistantMsg = reactive({ role: 'assistant', content: '', streaming: true, citations: [] })
+    aiMessages.value.push(assistantMsg)
+    aiLoading.value = true
 
   try {
     const history = aiMessages.value
       .slice(0, -1)
       .map(m => ({ role: m.role, content: m.content }))
 
-    await chatWithAIStream(msg, history, (token) => {
-      assistantMsg.content += token
-      aiScrollBottom()
-    })
+    await chatWithAIStream(msg, history,
+      // onToken: 流式文本
+      (token) => {
+        assistantMsg.content += token
+        aiScrollBottom()
+      },
+      // onCitations: RAG 引用来源
+      (citations) => {
+        assistantMsg.citations = citations
+        aiScrollBottom()
+      }
+    )
 
     aiApiOnline.value = true
     aiStatusText.value = '已连接'
@@ -1221,6 +1244,16 @@ async function aiScrollBottom() {
   await nextTick()
   const el = aiMsgContainer.value
   if (el) el.scrollTop = el.scrollHeight
+}
+
+// 把绝对域名链接（如 https://blog.fireflyai.site/posts/24）转成站内相对路径（/posts/24）
+// 这样本地开发点引用跳本地、线上点跳线上，且走 Vue Router 不刷新页面（音乐不中断）
+function citPath(link) {
+  try {
+    return new URL(link).pathname
+  } catch {
+    return link
+  }
 }
 
 function aiClearChat() {
@@ -1562,9 +1595,14 @@ async function loadDetail() {
 function handleDeleteDetail() {
   if (!detailPost.value?.id) return
   if (!confirm('确定要删除这篇文章吗？')) return
-  deletePost(detailPost.value.id)
-    .then(() => window.location.href = '/')
-    .catch(() => alert('删除失败'))
+  const id = detailPost.value.id
+  deletePost(id)
+    .then(() => {
+      toast('文章已删除 🗑️', 'success')
+      // SPA 跳转而非整页刷新：HomePage 不卸载，播放中的音乐不会中断
+      $router.push('/')
+    })
+    .catch(() => toast('删除失败', 'error'))
 }
 
 // 拉取音乐列表：接后端 /api/music/list，失败则保留 demo 数据兜底
@@ -1614,6 +1652,8 @@ watch(() => route.fullPath, () => {
   } else {
     detailPost.value = null
     renderedContent.value = ''
+    // 回到列表页（如发布/编辑文章后跳转）时重新拉取最新文章，免去手动刷新
+    loadData()
   }
 })
 
@@ -3021,6 +3061,24 @@ html[data-theme='dark'] .hero-area::after {
   border-radius: 16px 4px 16px 16px;
 }
 .user-text { white-space: pre-wrap; }
+
+/* ---- RAG 引用来源 ---- */
+.rag-citations {
+  margin-top: 0.5rem; padding: 0.4rem 0.7rem;
+  background: var(--bg-body, rgba(0,0,0,0.03));
+  border-radius: 8px; font-size: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  line-height: 1.5;
+}
+.cit-label { color: var(--text-dim); white-space: nowrap; }
+.cit-link {
+  display: inline-block; padding: 2px 8px;
+  background: var(--primary-bg, rgba(16,185,129,0.1));
+  color: var(--primary, #10b981);
+  border-radius: 6px; text-decoration: none;
+  font-weight: 500; transition: all 0.2s;
+}
+.cit-link:hover { background: var(--primary, #10b981); color: #fff; transform: translateY(-1px); }
 
 /* ---- 打字动画 ---- */
 .typing { align-items: center; }

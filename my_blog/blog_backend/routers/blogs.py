@@ -7,9 +7,11 @@ from curd.blogs import (
     get_blog_list,
     get_list_count,
     get_blog_detail,
-    add_blog,
-    delete_blog,
-    update_blog,
+)
+from services.blog_service import (
+    create_blog_with_rag,
+    update_blog_with_rag,
+    delete_blog_with_rag,
 )
 from utils.response import success_response
 from utils.auth import get_current_user
@@ -55,8 +57,7 @@ async def add(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    create_blog = await add_blog(db, blog, current_user.id)
-    result = await get_blog_detail(db,create_blog.id)
+    result = await create_blog_with_rag(db, blog, current_user.id)
     return success_response(message="添加博客成功", data=result)
 
 
@@ -76,7 +77,7 @@ async def delete(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="您没有权限删除此文章"
         )
-    await delete_blog(db, id)
+    await delete_blog_with_rag(db, id)
     return success_response(message="删除博客成功")
 
 
@@ -97,7 +98,7 @@ async def update(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="你没有权限修改此文章"
         )
-    result = await update_blog(db, id, blog)
+    result = await update_blog_with_rag(db, id, blog)
     return success_response(message="修改博客成功", data=result)
 
 # RSS 订阅源(公开, 无需登录)
