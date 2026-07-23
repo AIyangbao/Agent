@@ -1,7 +1,7 @@
 import redis.asyncio as redis
 import json
 from typing import Any
-from settings import settings
+from config.settings import settings
 
 # 创建 Redis 的连接对象
 redis_client = redis.Redis(
