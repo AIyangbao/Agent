@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  # ============================================
+  # 1. MySQL 数据库
+  # ============================================
+  mysql:
+    image: crpi-9640jlmu7u6aesbj.cn-guangzhou.personal.cr.aliyuncs.com/ali_cat/agent:mysql8.0
+    container_name: blog-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PWD}
+      MYSQL_DATABASE: ${DB_NAME}
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"        # 宿主机 3307 → 容器 3306，避免和本地 MySQL 冲突
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PWD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - blog-network
+
+  # ============================================
+  # 2. FastAPI 后端
+  # ============================================
+  backend:
+    image: crpi-9640jlmu7u6aesbj.cn-guangzhou.personal.cr.aliyuncs.com/ali_cat/agent:blog_backend_latest
+    container_name: blog-backend
+    restart: always
+    environment:
+      DB_HOST: mysql          # 指向 MySQL 容器名，不是 127.0.0.1
+      DB_PORT: 3306           # 容器内部端口，不是宿主机的 3307
+      DB_USER: root
+      DB_PWD: ${DB_PWD}
+      DB_NAME: ${DB_NAME}
+      JWT_PWD: ${JWT_PWD}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
+      QWEN_MODEL: ${QWEN_MODEL}
+    depends_on:
+      mysql:
+        condition: service_healthy   # 等 MySQL 健康检查通过才启动
+    volumes:
+      - chroma_data:/app/chroma_data
+    networks:
+      - blog-network
+
+  # ============================================
+  # 3. nginx 前端
+  # ============================================
+  frontend:
+    image: crpi-9640jlmu7u6aesbj.cn-guangzhou.personal.cr.aliyuncs.com/ali_cat/agent:blog_fontend-latest
+    container_name: blog-frontend
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl                    # 证书
+      - ./fontend/nginx.conf:/etc/nginx/conf.d/default.conf   # 覆盖镜像里的配置
+    depends_on:
+      - backend
+    networks:
+      - blog-network
+
+# ============================================
+# 数据卷 & 网络
+# ============================================
+volumes:
+  mysql_data:                # MySQL 数据持久化
+  chroma_data:
+networks:
+  blog-network:              # 自定义桥接网
+    driver: bridge
