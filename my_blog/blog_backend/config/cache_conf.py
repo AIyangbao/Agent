@@ -2,7 +2,7 @@ import redis.asyncio as redis
 import json
 from typing import Any
 from config.settings import settings
-
+import random
 # 创建 Redis 的连接对象
 redis_client = redis.Redis(
     host=settings.REDIS_HOST,  # Redis 服务器的主机地址
@@ -11,8 +11,11 @@ redis_client = redis.Redis(
     decode_responses=True,  # 是否将子杰数据解码为字符串
 )
 
-# 设置 和 读取 (字符串 和 列表或字典)"[{}]"
-
+# ===== 缓存策略配置（集中管理，业务缓存服务引用，不放路由层） =====
+DEFAULT_CACHE_TTL = 600 # 基础 TTL：10分钟
+CACHE_TTL_JITTER = 300 # 随机抖动0~5分钟,防缓存雪崩
+PENETRATION_TTL = 60 # 防穿透结果 TTL(秒)
+NONE_SENTINEL = {"__none__": True} # 防穿透哨兵 (dict 形式,保证 json.loads 可解析)
 
 # 读取: 字符串
 async def get_cache(key: str):
@@ -65,3 +68,7 @@ async def clear_prefix(prefix: str):
     except Exception as e:
         print(f"清前缀缓存失败:{e}")
         return 0
+
+def jitter_ttl(base: int = DEFAULT_CACHE_TTL, jitter: int = CACHE_TTL_JITTER) -> int:
+    """带随机抖动的 TTL,避免大量 key 同时过期引发雪崩。"""
+    return base + random.randint(0,jitter)

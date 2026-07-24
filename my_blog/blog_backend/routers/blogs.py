@@ -8,7 +8,7 @@ from curd.blogs import (
     get_list_count,
     get_blog_detail,
 )
-from services.blog_service import (
+from my_blog.blog_backend.services.blog.rag import (
     create_blog_with_rag,
     update_blog_with_rag,
     delete_blog_with_rag,
