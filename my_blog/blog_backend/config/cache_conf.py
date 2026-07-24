@@ -46,3 +46,22 @@ async def set_cache(key: str, value: Any, expire: int = 3600):
     except Exception as e:
         print(f"设置缓存失败:{e}")
         return False
+
+# 删除缓存 delex(key)
+async def delete_cache(key: str):
+    try:
+        return await redis_client.delete(key)
+    except Exception as e:
+        print(f"删除缓存失败:{e}")
+        return False
+
+# 删除所有prefix*的key,用于列表缓存批量失效
+async def clear_prefix(prefix: str):
+    try:
+        keys = [k async for k in redis_client.scan_iter(match=f"{prefix}")]
+        if keys:
+            await redis_client.delete(*keys)
+        return len(keys)
+    except Exception as e:
+        print(f"清前缀缓存失败:{e}")
+        return 0
