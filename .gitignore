@@ -1,3 +1,12 @@
+﻿# 编辑器 / IDE
 /.vscode
+
+# 兄弟项目（非本博客，避免误提交）
 /dify
 /Dify资料
+
+# 本地 AI 记忆目录（不提交）
+.workbuddy
+
+# 环境变量 / 密钥：递归忽略所有 .env（含子目录，如 my_blog/blog_backend/.env）
+**/.env
