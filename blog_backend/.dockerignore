@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.git
+.gitignore
+venv
+.venv
+*.md
+tests/
+test.db
+pytest.ini
+.pytest_cache
+Docker部署指南.md
