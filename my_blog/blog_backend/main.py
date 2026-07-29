@@ -24,6 +24,10 @@ app.add_middleware(
 async def root():
     return {"message": "Hello World"}
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 
 # 挂载路由/注册路由
 app.include_router(blogs.router)

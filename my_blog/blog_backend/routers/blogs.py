@@ -8,10 +8,20 @@ from curd.blogs import (
     get_list_count,
     get_blog_detail,
 )
-from my_blog.blog_backend.services.blog.rag import (
+from services.blog_rag import (
     create_blog_with_rag,
     update_blog_with_rag,
     delete_blog_with_rag,
+)
+from services.blog_cache import (
+    build_list_key,
+    get_cached_blog_list,
+    set_cached_blog_list,
+    get_cached_blog_detail,
+    set_cached_blog_detail,
+    set_blog_detail_none,
+    invalidate_blog_list,
+    invalidate_blog_detail,
 )
 from utils.response import success_response
 from utils.auth import get_current_user
@@ -32,21 +42,34 @@ async def list_blogs(
     pageSize: int = Query(10, le=100),
     db: AsyncSession = Depends(get_db),
 ):
+    key = build_list_key(tagId,keyword, page, pageSize)
+    cached = await get_cached_blog_list(key)
+    if cached is not None:
+        return success_response(message="获取博客列表成功(缓存)", data=cached)
+    
     offset = (page - 1) * pageSize
     rows = await get_blog_list(db, tagId, offset, pageSize,keyword)
     total = await get_list_count(db, tagId,keyword)
     data = {"list": rows, "total": total}
+    await set_cached_blog_list(key, data)
     return success_response(message="获取博客列表成功", data=data)
 
 
 # 获取指定博客详情接口
 @router.get("/detail")
 async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db)):
+    cached = await get_cached_blog_detail(id)
+    if cached == "NONE":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="没有此文章信息")
+    if cached is not None:
+        return success_response(message="获取博客详情成功(缓存)",data=cached)
     blog = await get_blog_detail(db, id)
     if blog is None:
+        await set_blog_detail_none(id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="没有此文章信息"
         )
+    await set_cached_blog_detail(id,blog)
     return success_response(message="获取博客详情成功", data=blog)
 
 
@@ -58,6 +81,7 @@ async def add(
     db: AsyncSession = Depends(get_db),
 ):
     result = await create_blog_with_rag(db, blog, current_user.id)
+    await invalidate_blog_list()
     return success_response(message="添加博客成功", data=result)
 
 
@@ -78,6 +102,8 @@ async def delete(
             status_code=status.HTTP_403_FORBIDDEN, detail="您没有权限删除此文章"
         )
     await delete_blog_with_rag(db, id)
+    await invalidate_blog_list()
+    await invalidate_blog_detail(id)
     return success_response(message="删除博客成功")
 
 
@@ -99,6 +125,8 @@ async def update(
             status_code=status.HTTP_403_FORBIDDEN, detail="你没有权限修改此文章"
         )
     result = await update_blog_with_rag(db, id, blog)
+    await invalidate_blog_list()
+    await invalidate_blog_detail(id)
     return success_response(message="修改博客成功", data=result)
 
 # RSS 订阅源(公开, 无需登录)

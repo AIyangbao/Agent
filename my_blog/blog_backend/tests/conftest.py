@@ -130,3 +130,23 @@ async def auth_client_b(client):
         headers={"Authorization":f"Bearer {token}"},
     ) as c:
          yield c
+
+import redis.asyncio as aioredis
+
+# 6. Redis 客户端隔离（解决 pytest-asyncio 每测试新建 event loop 导致
+#    cache_conf.redis_client 单例绑定旧 loop 报 'Event loop is closed'）
+#    用独立测试 DB(db=1)，不碰你本机 db=0 的真实缓存
+@pytest_asyncio.fixture(autouse=True)
+async def redis_isolated():
+    client = aioredis.Redis(
+        host=os.environ.get("REDIS_HOST", "localhost"),
+        port=int(os.environ.get("REDIS_PORT", 6379)),
+        db=1,                       # 测试专用 DB，与真实缓存隔离
+        decode_responses=True,
+        protocol=2,
+    )
+    import config.cache_conf as cache_conf
+    cache_conf.redis_client = client   # 覆盖模块级单例，路由/服务层统一走新客户端
+    await client.flushdb()
+    yield
+    await client.aclose()

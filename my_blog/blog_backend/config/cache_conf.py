@@ -9,6 +9,7 @@ redis_client = redis.Redis(
     port=settings.REDIS_PORT,  # Redis 端口号
     db=settings.REDIS_DB,  # Redis 数据库编号, 0~15
     decode_responses=True,  # 是否将子杰数据解码为字符串
+    protocol=2, 
 )
 
 # ===== 缓存策略配置（集中管理，业务缓存服务引用，不放路由层） =====
@@ -61,7 +62,7 @@ async def delete_cache(key: str):
 # 删除所有prefix*的key,用于列表缓存批量失效
 async def clear_prefix(prefix: str):
     try:
-        keys = [k async for k in redis_client.scan_iter(match=f"{prefix}")]
+        keys = [k async for k in redis_client.scan_iter(match=f"{prefix}*")]
         if keys:
             await redis_client.delete(*keys)
         return len(keys)
