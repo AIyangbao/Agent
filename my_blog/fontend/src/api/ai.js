@@ -1,4 +1,5 @@
 import { post } from './request'
+import { apiUrl } from '../config'
 
 /**
  * 发送消息给 AI，获取回复（非流式，兼容旧逻辑）
@@ -30,7 +31,7 @@ export async function chatWithAIStream(message, history = [], onToken, onCitatio
   // 1) 网络层错误（后端没起 / 断网）→ NETWORK
   let resp
   try {
-    resp = await fetch('/api/ai/chat', {
+    resp = await fetch(apiUrl('/ai/chat'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -102,7 +103,7 @@ export async function fetchAIHistory(limit = 50) {
   const token = localStorage.getItem('blog_token')
   if (!token) return []
   try {
-    const resp = await fetch(`/api/ai/history?limit=${limit}`, {
+    const resp = await fetch(apiUrl(`/ai/history?limit=${limit}`), {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!resp.ok) return []
@@ -121,7 +122,7 @@ export async function clearAIHistory() {
   const token = localStorage.getItem('blog_token')
   if (!token) return
   try {
-    await fetch('/api/ai/history', {
+    await fetch(apiUrl('/ai/history'), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })

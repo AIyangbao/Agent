@@ -17,6 +17,10 @@ from sqlalchemy import text
 from config.base import Base
 from config.db_conf import async_engine
 
+# 必须显式导入全部模型，否则它们不会注册到 Base.metadata，
+# create_all 会因为 metadata 里没有表定义而建出空库
+from models import blogs, users, musics, tags, chat_history, comments
+
 
 async def init_database():
     "初始化数据表,仅创建不存在的表，并插入初始标签数据"

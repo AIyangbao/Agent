@@ -43,7 +43,7 @@
           </footer>
         </article>
 
-        <CommentSection :blogId="id" :list="[]" />
+        <CommentSection :blogId="id" />
       </section>
 
       <!-- 右栏 -->

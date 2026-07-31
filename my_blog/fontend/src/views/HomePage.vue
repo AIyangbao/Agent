@@ -229,7 +229,7 @@
             </div>
 
             <!-- 评论 -->
-            <CommentSection :blogId="detailPost.id" :list="[]" />
+            <CommentSection :blogId="detailPost.id" />
           </template>
 
           <!-- 加载失败 -->
@@ -882,6 +882,7 @@ import { ref, computed, onMounted, onUnmounted, watch, reactive, nextTick, injec
 import { useRoute, useRouter } from 'vue-router'
 import { fetchPosts, fetchPostById, deletePost, createPost } from '../api/posts'
 import { chatWithAIStream, fetchAIHistory, clearAIHistory } from '../api/ai'
+import { apiUrl } from '../config'
 import { useUserStore } from '../store'
 import CommentSection from '../components/CommentSection.vue'
 import { renderMarkdown } from '../utils/markdown.js'
@@ -1608,7 +1609,7 @@ function handleDeleteDetail() {
 // 拉取音乐列表：接后端 /api/music/list，失败则保留 demo 数据兜底
 async function fetchMusicList() {
   try {
-    const res = await fetch('/api/music/list')
+    const res = await fetch(apiUrl('/music/list'))
     if (!res.ok) return
     const json = await res.json()
     if (json && Array.isArray(json.data) && json.data.length) {

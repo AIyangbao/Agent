@@ -2,7 +2,7 @@
  * 基础请求封装
  * 对接后端 FastAPI 统一响应格式：{ code, msg, data }
  */
-const BASE = '/api'
+import { apiUrl } from '../config'
 
 async function request(url, options = {}) {
   // 从 localStorage 读取 token，加到请求头
@@ -19,7 +19,7 @@ async function request(url, options = {}) {
   if (config.body && typeof config.body === 'object') {
     config.body = JSON.stringify(config.body)
   }
-  const res = await fetch(`${BASE}${url}`, config)
+  const res = await fetch(apiUrl(url), config)
   const json = await res.json()
   if (!res.ok || json.code !== 200) {
     throw new Error(json.detail || json.message || '请求失败')
