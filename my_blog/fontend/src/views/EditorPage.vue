@@ -101,7 +101,7 @@ async function publish() {
   try {
     // 将标签名转换为标签ID
     const tagIds = tags.map(t => TAG_MAP[t]).filter(id => id != null)
-    const res = await createPost({ title: t, content: c, user_id: 1, tag_ids: tagIds })
+    const res = await createPost({ title: t, content: c, tag_ids: tagIds })
     title.value = ''
     content.value = ''
     tag.value = ''
