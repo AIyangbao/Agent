@@ -8,7 +8,7 @@ from config.db_conf import AsyncSessionLocal
 from models.blogs import Blog
 from .embeddings import embed_texts
 from .store import add_chunks
-
+import asyncio
 CHUNK_SIZE = 500 # ，每块字符数(中文按字计)
 CHUNK_OVERLAP = 50 # 块间重叠,避免切断语义边界
 MIN_CONTENT_LEN = 50 # 正文最短长度,低于此视为噪声/测试文,不入库
@@ -62,7 +62,7 @@ async def ingest_one(post_id: int, title:str, content: str) -> int:
     chunks = split_text(text)
     if not chunks:
         return 0
-    embeddings = embed_texts(chunks)
+    embeddings = await asyncio.to_thread(embed_texts,chunks)
     metadatas = [{
         "post_id": post_id,
         "title": title,

@@ -15,10 +15,13 @@ def _safe_remove(post_id: int):
     except Exception as e:
         print(f"[RAG]文章 {post_id} 移除失败(不影响业务):{e}")
 
-async def create_blog_with_rag(db,blog,user_id):
+async def create_blog_with_rag(db,blog,user_id,background_tasks=None):
     """发文章: 写库 + 增量入向量库。RAG 失败不影响发文。"""
     post = await add_blog(db, blog, user_id)
-    await _safe_ingest(post.id,post.title,post.content)
+    if background_tasks is not None:
+        background_tasks.add_task(_safe_ingest, post.id, post.title, post.content)
+    else:
+        await _safe_ingest(post.id,post.title,post.content)
     return await get_blog_detail(db, post.id)
 
 async def update_blog_with_rag(db,blog_id,blog):

@@ -11,17 +11,20 @@ os.environ.setdefault("DEBUG_MODE","true")
 os.environ.setdefault("REDIS_HOST","localhost")
 os.environ.setdefault("REDIS_PORT","6379")
 os.environ.setdefault("REDIS_DB","0")
-
+os.environ.setdefault("DB_HOST","localhost")
+os.environ.setdefault("DB_PORT","3306")
+os.environ.setdefault("DB_USER","root")
+os.environ.setdefault("DB_PWD","test")
+os.environ.setdefault("DB_NAME","test_blog")
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient,ASGITransport
 from sqlalchemy import text,event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker,AsyncSession
-
+import asyncio
 from config.base import Base
 from config.db_conf import get_db
 from main import app
-
 # 1. 创建测试用 SQLite 异步引擎
 #    文件模式 "sqlite+aiosqlite:///./test.db" → 在项目根目录生成 test.db
 #    优点：测试数据库不会在内存中消失，方便调试
@@ -144,9 +147,40 @@ async def redis_isolated():
         db=1,                       # 测试专用 DB，与真实缓存隔离
         decode_responses=True,
         protocol=2,
+        socket_connect_timeout=2,
+        socket_timeout=2,
     )
     import config.cache_conf as cache_conf
+    try:
+        await asyncio.wait_for(client.ping(), timeout=3)  
+    except Exception:
+        cache_conf.redis_client = None # ← Redis 没跑，缓存层整体降级为 no-op
+        yield
+        return
     cache_conf.redis_client = client   # 覆盖模块级单例，路由/服务层统一走新客户端
     await client.flushdb()
     yield
     await client.aclose()
+
+import pytest_asyncio
+from curd.blogs import add_blog, get_blog_detail
+import routers.blogs as blogs_router
+import services.blog_rag as blog_rag
+
+@pytest_asyncio.fixture(autouse=True)
+async def dsiable_rag_in_test():
+    """测试环境禁用RAG入库, 避免真是打 DashScope embedding(慢且花钱)."""
+    async def _fake_create(db,blog, user_id, background_tasks=None):
+        post = await add_blog(db, blog, user_id)
+        return await get_blog_detail(db, post.id)
+    async def _fake_update(db,blog_id, blog):
+        return await get_blog_detail(db, blog_id)
+    # 路由用的是直接 import 的名字，必须 patch 到 routers.blogs 上
+    orig_c = blogs_router.create_blog_with_rag
+    orig_u = blogs_router.update_blog_with_rag
+    blogs_router.create_blog_with_rag = _fake_create
+    blogs_router.update_blog_with_rag = _fake_update
+    yield
+    blogs_router.create_blog_with_rag = orig_c
+    blogs_router.update_blog_with_rag = orig_u
+    

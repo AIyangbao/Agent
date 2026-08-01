@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException,Response
+from fastapi import APIRouter, Depends, Query, HTTPException,Response, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.db_conf import get_db
 import html
@@ -77,10 +77,11 @@ async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db)):
 @router.post("/add")
 async def add(
     blog: BlogCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await create_blog_with_rag(db, blog, current_user.id)
+    result = await create_blog_with_rag(db, blog, current_user.id, background_tasks)
     await invalidate_blog_list()
     return success_response(message="添加博客成功", data=result)
 
