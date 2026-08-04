@@ -35,7 +35,7 @@ async def init_database():
         await conn.execute(
             text(
                 "INSERT IGNORE INTO tag (id, name) VALUES "
-                "(1,'Python'),(2,'AI'),(3,'Vue'),(4,'FastAPI'),(5,'Docker'),(6,'其他')"
+                "(1,'Python'),(2,'AI'),(3,'Vue'),(4,'FastAPI'),(5,'Docker')"
             )
         )
         print("初始标签数据已就绪！")
