@@ -73,9 +73,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     volumes:
       - chroma_data:/app/chroma_data
+      - uploads_data:/app/uploads   # 图片上传持久化（落盘在 /app/uploads，与 main.py StaticFiles 挂载一致）
     networks:
       - blog-network
 
@@ -107,6 +108,7 @@ services:
 volumes:
   mysql_data:                # MySQL 数据持久化
   chroma_data:               # Chroma 向量库持久化（需 app 的 persist_directory=/app/chroma_data）
+  uploads_data:              # 图片上传持久化（backend 容器内 /app/uploads）
 networks:
   blog-network:              # 自定义桥接网
     driver: bridge
