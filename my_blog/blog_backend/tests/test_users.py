@@ -72,3 +72,13 @@ class TestUserLogin:
             json={"username":"nobody","password":"whatever123"},
         )
         assert resp.status_code == 401
+
+class TestUserAuthEdge:
+    async def test_invalid_token_rejected(self, client: AsyncClient):
+        """带假 token 访问受保护接口 -> 401"""
+        resp = await client.post(
+            "/api/blogs/add",
+            json={"title": "伪造token发文", "content": "应被拦截"},
+            headers={"Authorization": "Bearer faketoken123"},
+        )
+        assert resp.status_code == 401

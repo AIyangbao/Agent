@@ -78,7 +78,7 @@ async def setup_db():
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
         # 6 个默认标签，和你项目 init_db.py 里的一致
-        default_tags = ["Python","AI","Vue","Docker","FastAPI","其他"]
+        default_tags = ["Python","AI","Vue","Docker","FastAPI"]
         for name in default_tags:
             await conn.execute(
                 text("INSERT INTO tag(name,is_delete) VALUES(:name,0)"),
