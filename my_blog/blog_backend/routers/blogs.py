@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query, HTTPException,Response, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException,Response, BackgroundTasks, Request, UploadFile, File
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.db_conf import get_db
 import html
@@ -23,7 +24,9 @@ from services.blog_cache import (
     invalidate_blog_list,
     invalidate_blog_detail,
 )
-from utils.response import success_response
+from services.rss_service import generate_blog_feed
+from services.image_service import save_image
+from utils.response import success_response, error_response
 from utils.auth import get_current_user
 from starlette import status
 from schemas.blogs import BlogCreate, BlogUpdate
@@ -50,7 +53,7 @@ async def list_blogs(
     offset = (page - 1) * pageSize
     rows = await get_blog_list(db, tagId, offset, pageSize,keyword)
     total = await get_list_count(db, tagId,keyword)
-    data = {"list": rows, "total": total}
+    data = {"list": [b.model_dump() for b in rows], "total": total}
     await set_cached_blog_list(key, data)
     return success_response(message="获取博客列表成功", data=data)
 
@@ -134,42 +137,49 @@ async def update(
 @router.get('/rss')
 async def blog_rss(
     limit: int = Query(20,le=50),
+    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
     rows = await get_blog_list(db,None,0,limit)
-    site = "https://blog.fireflyai.site"
-    now = datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0800")
-    items = []
-    for row in rows:
-        b = row["Blog"]
-        title = html.escape(b.title)
-        link = f"{site}/posts/{b.id}"
-        desc = html.escape((b.content or "")[:300])
-        pub = (
-            b.create_time.strftime("%a, %d %b %Y %H:%M:%S +0800")
-            if b.create_time
-            else now
-        )
-        items.append(
-            f'    <item>\n'
-            f'      <title>{title}</title>\n'
-            f'      <link>{link}</link>\n'
-            f'      <guid>{link}</guid>\n'
-            f'      <pubDate>{pub}</pubDate>\n'
-            f'      <description>{desc}</description>\n'
-            f'    </item>'
-        )
+    # 用请求 host 拼站点地址，本地/线上自动适应，不再硬编码域名
+    base = str(request.base_url).rstrip("/") if request else "https://blog.fireflyai.site"
+    xml = generate_blog_feed(rows, base)
+    return Response(content=xml, media_type="application/rss+xml")
+
+@router.get('/sitemap.xml')
+async def sitemap(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await get_blog_list(db, None, 0, 1000)  # 取全部文章
+    base = str(request.base_url).rstrip("/")       # 本地/线上自动适应，不再硬编码
+    urls = [f"  <url><loc>{base}/</loc></url>"]
+    for r in rows:
+        bid = getattr(r, "id", None)               # BlogResponse 是模型对象，用属性访问
+        if bid is None:
+            continue
+        urls.append(f"  <url><loc>{base}/posts/{bid}</loc></url>")
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<rss version="2.0">\n'
-        '  <channel>\n'
-        '    <title>技术宅小窝博客</title>\n'
-        f'    <link>{site}</link>\n'
-        '    <description>个人技术博客，记录学习与项目心得</description>\n'
-        '    <language>zh-CN</language>\n'
-        f'    <lastBuildDate>{now}</lastBuildDate>\n'
-        f'{chr(10).join(items)}\n'
-        '  </channel>\n'
-        '</rss>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls)
+        + "\n</urlset>"
     )
-    return Response(content=xml, media_type="application/rss+xml")
+    return Response(content=xml, media_type="application/xml")
+
+@router.post("/upload_image")
+async def upload_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    # 读文件 -> 调业务层 -> 返回响应
+    try:
+        data = await file.read()
+        url = save_image(data, file.filename, file.content_type)
+    except ValueError as e:
+        return error_response(400, str(e))
+    except Exception as e:
+        return error_response(500, f"上传失败:{e}")
+    return success_response(message="上传成功", data={"url": url})
+
+

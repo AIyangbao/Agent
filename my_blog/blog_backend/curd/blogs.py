@@ -25,8 +25,20 @@ async def get_blog_list(
         )
     query = query.offset(skip).limit(limit).order_by(Blog.create_time.desc())
     result = await db.execute(query)
-    blogs = result.mappings().all()
-    return blogs
+    rows = result.mappings().all()
+
+    # 多对多聚合: 一篇博客多个标签 -> 多行, 合并成 tags_name
+    agg = {}
+    for row  in rows:
+        blog = row["Blog"]
+        if blog.id not in agg:
+            agg[blog.id] = BlogResponse(
+                id = blog.id, title = blog.title, content = blog.content,
+                user_id = blog.user_id, create_time = blog.create_time,tags_name = [],
+            )
+        if row["name"]:
+            agg[blog.id].tags_name.append(row["name"])
+    return list(agg.values())
 
 
 # 获取指定标签博客总量
@@ -72,9 +84,36 @@ async def add_blog(db: AsyncSession, blog_data: BlogCreate, user_id: int):
     blog = Blog(title=blog_data.title, content=blog_data.content, user_id=user_id)
     db.add(blog)
     await db.flush()
-    for tag_id in blog_data.tag_ids or []:
-        blog_tag = Blog_tags(blog_id=blog.id, tag_id=tag_id)
-        db.add(blog_tag)
+
+    final_tag_ids = set()
+
+    # 已知 ID： 只保留实际存在的标签
+    if blog_data.tag_ids:
+        res = await db.execute(
+            select(tag.id).where(tag.id.in_(blog_data.tag_ids), tag.is_delete == False)
+        )
+        final_tag_ids.update(r.id for r in res.all())
+
+    # 标签名: 存在则取id, 不存在则新建
+    if blog_data.tag_names:
+        for name in blog_data.tag_names:
+            name = (name or "").strip()
+            if not name:
+                continue
+            res = await db.execute(
+                select(tag).where(tag.name == name, tag.is_delete == False)
+            )
+            existing = res.scalar_one_or_none()
+            if existing:
+                final_tag_ids.add(existing.id)
+            else:
+                new_tag = tag(name=name)
+                db.add(new_tag)
+                await db.flush()
+                final_tag_ids.add(new_tag.id)
+
+    for tid in final_tag_ids:
+        db.add(Blog_tags(blog_id=blog.id,tag_id=tid))
     await db.flush()
     return blog
 
