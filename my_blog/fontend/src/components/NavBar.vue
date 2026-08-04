@@ -12,24 +12,6 @@
         <router-link to="/" class="nav-link" :class="{ active: isHomeActive }">
           <span class="link-icon">⌂</span> 主页
         </router-link>
-        <div class="nav-dropdown-wrap" @mouseenter="showPostMenu = true" @mouseleave="showPostMenu = false">
-          <router-link to="/posts" class="nav-link" active-class="active">
-            <span class="link-icon">📄</span> 文章
-          </router-link>
-          <transition name="fade">
-            <div v-if="showPostMenu" class="post-dropdown">
-              <router-link to="/?view=archive" class="dropdown-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> 归档
-              </router-link>
-              <router-link to="/category" class="dropdown-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> 分类
-              </router-link>
-              <router-link to="/tags" class="dropdown-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> 标签
-              </router-link>
-            </div>
-          </transition>
-        </div>
         <router-link v-if="user.isLoggedIn" to="/write" class="nav-link" active-class="active">
           <span class="link-icon">✎</span> 写文章
         </router-link>
@@ -106,7 +88,6 @@
     <transition name="slide-down">
       <div v-if="mobileOpen" class="mobile-menu">
         <router-link to="/" class="mobile-link" @click="mobileOpen = false">主页</router-link>
-        <router-link to="/posts" class="mobile-link" @click="mobileOpen = false">文章</router-link>
         <router-link v-if="user.isLoggedIn" to="/write" class="mobile-link" @click="mobileOpen = false">写文章</router-link>
         <router-link v-if="user.isLoggedIn" to="/ai" class="mobile-link" @click="mobileOpen = false">AI</router-link>
         <div v-if="!user.isLoggedIn" class="mobile-link" @click="$router.push('/auth'); mobileOpen=false">登录 / 注册</div>
@@ -138,7 +119,6 @@ const route = useRoute()
 const showMenu = ref(false)
 const mobileOpen = ref(false)
 const showTheme = ref(false)
-const showPostMenu = ref(false)
 
 // 主页导航高亮：仅纯首页（/ 无 query、非详情/AI/标签/分类/写文章）才亮
 const isHomeActive = computed(() => {
@@ -355,27 +335,6 @@ html[data-theme='dark'] .theme-icon-svg { color: #94a3b8; }
 .dropdown-item:hover { background: var(--bg-body); color: var(--primary); }
 .dropdown-item.logout { color: var(--danger); }
 .dropdown-item.logout:hover { background: #fef2f2; }
-
-/* 文章下拉菜单 */
-.nav-dropdown-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.post-dropdown {
-  position: absolute; top: calc(100% + 8px); left: 0;
-  min-width: 140px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 0.4rem 0;
-  z-index: 200;
-}
-.post-dropdown .dropdown-item {
-  display: flex; align-items: center; gap: 0.5rem;
-}
-.post-dropdown .dropdown-item svg { width: 15px; height: 15px; }
 
 /* 移动端菜单按钮 */
 .menu-toggle {

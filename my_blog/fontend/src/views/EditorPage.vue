@@ -20,9 +20,8 @@
             <option value="Vue">Vue</option>
             <option value="FastAPI">FastAPI</option>
             <option value="Docker">Docker</option>
-            <option value="其他">其他</option>
           </select>
-          <input type="text" v-model="extraTags" placeholder="其他标签（逗号分隔）">
+          <input type="text" v-model="extraTags" placeholder="自定义标签（逗号分隔）">
         </div>
 
         <div class="editor-toolbar">
@@ -59,7 +58,7 @@ const toast = inject('toast')
 const user = useUserStore()
 
 // 标签名 → 标签ID 映射（需与数据库 tag 表一致，后续可改为接口获取）
-const TAG_MAP = { 'Python': 1, 'AI': 2, 'Vue': 3, 'FastAPI': 4, 'Docker': 5, '其他': 6 }
+const TAG_MAP = { 'Python': 1, 'AI': 2, 'Vue': 3, 'FastAPI': 4, 'Docker': 5 }
 
 const title = ref('')
 const content = ref('')
@@ -96,12 +95,11 @@ async function publish() {
     const tt = t.trim()
     if (tt) tags.push(tt)
   })
-  if (!tags.length) tags.push('其他')
 
   try {
     // 将标签名转换为标签ID
     const tagIds = tags.map(t => TAG_MAP[t]).filter(id => id != null)
-    const res = await createPost({ title: t, content: c, tag_ids: tagIds })
+    const res = await createPost({ title: t, content: c, user_id: 1, tag_ids: tagIds })
     title.value = ''
     content.value = ''
     tag.value = ''

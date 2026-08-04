@@ -401,15 +401,15 @@ onMounted(() => {
 /* ---- Markdown 内容样式（浅色适配）---- */
 .markdown-body :deep(p) { margin: 0 0 0.5rem; }
 .markdown-body :deep(p:last-child) { margin-bottom: 0; }
-.markdown-body :deep(code) {
+.markdown-body :deep(:not(pre) > code) {
   background: #f1f5f9; color: #be123c; padding: 0.15em 0.4em;
   border-radius: 5px; font-size: 13px; font-family: 'Fira Code', monospace;
 }
 .markdown-body :deep(pre) {
-  background: #1e293b; border: 1px solid #334155;
-  border-radius: 10px; padding: 0.85rem 1.1rem; overflow-x: auto; margin: 0.5rem 0;
+  background: #282c34; border: 1px solid #334155;
+  border-radius: 10px; padding: 0; overflow: hidden; margin: 0.5rem 0;
 }
-.markdown-body :deep(pre code) { background: none; padding: 0; color: #e2e8f0; font-size: 13px; }
+.markdown-body :deep(pre code) { background: none; padding: 0; font-size: 13px; }
 .markdown-body :deep(strong) { color: var(--text); font-weight: 700; }
 .markdown-body :deep(h2), .markdown-body :deep(h3), .markdown-body :deep(h4) {
   margin: 0.6rem 0 0.3rem; color: var(--text); font-weight: 700;

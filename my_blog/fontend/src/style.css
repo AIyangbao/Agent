@@ -118,3 +118,124 @@ html[data-theme='dark'] body {
   color-scheme: dark;
 }
 html[data-theme='dark'] ::-webkit-scrollbar-thumb { background: var(--primary-light); opacity: 0.35; }
+
+/* ========== 代码块增强：行号 + 复制按钮 ==========
+   注意：这些 DOM 由 markdown.js 的 enhanceCodeBlocks 动态注入，
+   没有 SFC 的 data-v 属性，必须放在全局（非 scoped）才能命中。
+   旧 .detail-body/.ai-chat-wrapper 里的 :deep(pre) 仍会作用到这些 pre，
+   故关键属性用 !important 保底，避免样式叠加冲突。 */
+.code-block {
+  position: relative;
+  margin: 1em 0 !important;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #334155 !important;
+  background: #1e293b !important;
+}
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.8rem;
+  background: #0f172a;
+  border-bottom: 1px solid #334155;
+}
+.code-lang {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.code-copy {
+  font-size: 12px;
+  color: #94a3b8;
+  background: transparent;
+  border: 1px solid #334155;
+  border-radius: 5px;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.code-copy:hover { color: #e2e8f0; border-color: #475569; }
+.code-copy.copied { color: #34d399; border-color: #34d399; }
+.code-block pre {
+  margin: 0 !important;
+  padding: 0.9rem 1rem !important;
+  overflow-x: auto !important;
+  background: #1e293b !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+.code-block pre code {
+  background: none !important;
+  padding: 0 !important;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.code-line {
+  display: block;
+  position: relative;
+  padding-left: 3.2em;
+  counter-increment: codeline;
+  white-space: pre;
+}
+.code-line::before {
+  content: counter(codeline);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2.6em;
+  padding-right: 0.6em;
+  text-align: right;
+  color: #475569;
+  user-select: none;
+}
+
+/* ========== 图片：懒加载 + 点击放大灯箱 ==========
+   同样由 markdown.js 动态注入（<img class="md-image">），必须放全局。 */
+.md-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.2rem auto;
+  border-radius: 8px;
+  cursor: zoom-in;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  background: var(--bg-body);
+  transition: filter 0.2s;
+}
+.md-image:hover { filter: brightness(0.97); }
+
+/* 灯箱遮罩（单例，由 enhanceImages 动态创建并挂到 body） */
+.md-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(15, 23, 42, 0.92);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  cursor: zoom-out;
+}
+.md-lightbox.open { opacity: 1; pointer-events: auto; }
+.md-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* LaTeX 公式渲染失败兜底样式（正常公式由 KaTeX 自带 CSS 渲染） */
+.math-error {
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  font-family: monospace;
+}
+

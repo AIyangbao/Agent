@@ -146,6 +146,464 @@
       <transition name="view-fade" mode="out-in">
       <section class="main-content" :key="viewKey">
 
+        <!-- ====== 视图 D：文章详情（/posts/:id 路由） ====== -->
+        <template v-if="isDetailPage">
+          <!-- 加载中 -->
+          <div v-if="detailLoading && !detailPost" class="detail-loading">
+            <div class="loading-spinner"></div>
+            <p>正在加载文章...</p>
+          </div>
+
+          <template v-else-if="detailPost">
+            <!-- tab 行（跟主页一致） -->
+            <div class="list-header card">
+              <div class="tab-group">
+                <button
+                  class="tab-pill home-pill"
+                  :class="{ active: false }"
+                  @click="goHome"
+                  title="回到首页"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tab-pill-icon"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+                </button>
+                <button
+                  v-for="tab in tabs"
+                  :key="tab.key"
+                  class="tab-pill"
+                  :class="{ active: activeTab === tab.key }"
+                  @click="activeTab = tab.key; $router.push('/')"
+                >
+                  <svg v-if="tab.key === 'archive'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tab-pill-icon"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+                  {{ tab.label }}
+                  <span v-if="tab.count !== undefined" class="tab-pill-count">{{ tab.count }}</span>
+                </button>
+              </div>
+              <router-link to="/posts" class="more-link">更多 →</router-link>
+            </div>
+
+            <!-- 字数 + 阅读时间 -->
+            <div class="detail-word-info">
+              <span class="dwi-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dwi-icon"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                {{ detailWordCount }} 字
+              </span>
+              <span class="dwi-sep">⊙</span>
+              <span class="dwi-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dwi-icon"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                {{ detailReadTime }} 分钟 · 阅读时长
+              </span>
+            </div>
+
+            <!-- 绿色左边栏 + 标题 -->
+            <div class="detail-title-block card">
+              <div class="post-accent-bar"></div>
+              <div class="title-row">
+                <h1 class="detail-title">{{ detailPost.title }}</h1>
+                <button class="btn-share" @click="sharePost" title="分享文章">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  分享
+                </button>
+              </div>
+            </div>
+
+            <!-- meta 行 -->
+            <div class="detail-meta-row">
+              <span class="dm-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dm-icon"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {{ detailPost.date || '未知日期' }}
+              </span>
+              <span class="dm-sep">|</span>
+              <span class="dm-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dm-icon"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                {{ detailPost.category }}
+              </span>
+              <span class="dm-sep">|</span>
+              <span v-for="tag in (detailPost.tags || []).slice(0, 4)" :key="tag" class="dm-tag">#{{ tag }}</span>
+            </div>
+
+            <!-- 封面图 -->
+            <div v-if="detailPost.cover_image" class="detail-cover">
+              <img :src="detailPost.cover_image" :alt="detailPost.title" />
+            </div>
+
+            <!-- 阅读进度条（仅详情页） -->
+            <div class="reading-progress" :style="{ transform: `scaleX(${readProgress / 100})` }"></div>
+
+            <!-- Markdown 正文 -->
+            <article class="detail-body card" ref="detailBodyRef" v-html="renderedContent"></article>
+
+            <!-- 删除按钮 -->
+            <div class="-detail-actions" v-if="isLoggedIn">
+              <button class="btn-delete" @click="handleDeleteDetail">删除此文章</button>
+            </div>
+
+            <!-- 评论 -->
+            <CommentSection :blogId="detailPost.id" />
+
+            <section class="related-section" v-if="isDetailPage && relatedPosts.length">
+              <h3 class="related-title">相关文章</h3>
+              <div class="related-grid">
+                <router-link
+                  v-for="p in relatedPosts"
+                  :key="p.id"
+                  :to="'/posts/' + p.id"
+                  class="related-card"
+                >
+                  <div class="related-card-title">{{ p.title }}</div>
+                  <div class="related-card-tags">
+                    <span v-for="t in (p.tags || []).slice(0, 3)" :key="t" class="related-tag">#{{ t }}</span>
+                  </div>
+                  <p class="related-card-excerpt">{{ p.excerpt }}</p>
+                </router-link>
+              </div>
+            </section>
+          </template>
+
+          <!-- 加载失败 -->
+          <div v-else-if="!detailLoading && !detailPost" class="empty-state">
+            <span class="empty-icon">😵</span>
+            <p>文章加载失败或不存在</p>
+            <button class="btn-empty" @click="$router.push('/')">返回首页</button>
+          </div>
+        </template>
+
+        <!-- ====== 视图 F：AI 对话助手（/ai 路由） ====== -->
+        <template v-if="isAIPage">
+          <!-- Tab 行 -->
+          <div class="list-header card">
+            <div class="tab-group">
+              <button
+                class="tab-pill home-pill"
+                :class="{ active: activeTab === 'home' }"
+                @click="goHome"
+                title="回到首页"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tab-pill-icon"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+              </button>
+              <button
+                v-for="tab in tabs"
+                :key="tab.key"
+                class="tab-pill"
+                :class="{ active: activeTab === tab.key }"
+                @click="selectTab(tab.key)"
+              >
+                {{ tab.label }}
+                <span v-if="tab.count !== undefined" class="tab-pill-count">{{ tab.count }}</span>
+              </button>
+            </div>
+            <!-- 文章下拉菜单（归档 / 分类 / 标签） -->
+            <div class="home-post-menu" ref="postMenuRef">
+              <button
+                class="home-post-menu-btn"
+                :class="{ active: showPostMenu }"
+                @click="togglePostMenu"
+              >
+                <span class="link-icon">📄</span> 文章
+                <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg>
+              </button>
+              <transition name="fade">
+                <Teleport to="body">
+                  <div v-if="showPostMenu" class="post-dropdown-menu" :style="postMenuStyle" @click.stop>
+                    <router-link to="/?view=archive" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                      <span>归档</span>
+                    </router-link>
+                    <router-link to="/category" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                      <span>分类</span>
+                    </router-link>
+                    <router-link to="/tags" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                      <span>标签</span>
+                    </router-link>
+                  </div>
+                </Teleport>
+              </transition>
+            </div>
+          </div>
+
+          <!-- AI 聊天容器 -->
+          <div class="ai-chat-wrapper card">
+            <!-- 顶部标题栏 -->
+            <div class="chat-header">
+              <div class="chat-header-left">
+                <span class="chat-icon">🤖</span>
+                <div>
+                  <h2>AI 对话助手</h2>
+                  <p class="chat-subtitle">
+                    <span v-if="aiApiOnline" class="dot dot-online"></span>
+                    <span v-else class="dot dot-offline"></span>
+                    {{ aiStatusText }}
+                  </p>
+                </div>
+              </div>
+              <button class="btn-clear" @click="aiClearChat" v-if="aiMessages.length">清空对话</button>
+            </div>
+
+            <!-- 消息区域 -->
+            <div class="chat-messages" ref="aiMsgContainer">
+              <!-- 空状态欢迎语 -->
+              <div v-if="aiMessages.length === 0" class="welcome">
+                <div class="welcome-icon">✨</div>
+                <h3>你好，我是你的 AI 助手</h3>
+                <p>可以问我关于技术的问题，或者聊聊你的想法</p>
+                <div class="suggestions">
+                  <button v-for="q in aiQuickQuestions" :key="q" class="sug-btn" @click="aiSendMessage(q)">
+                    {{ q }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- 消息列表 -->
+              <div
+                v-for="(msg, i) in aiMessages"
+                :key="i"
+                class="msg-row"
+                :class="msg.role"
+              >
+                <div class="msg-bubble" :class="msg.role">
+                  <div class="msg-avatar">
+                    <template v-if="msg.role === 'user'">
+                      <img v-if="user.avatar" :src="user.avatar" class="avatar-img" alt="avatar" />
+                      <span v-else class="avatar-placeholder">{{ user.initial || '🧑‍💻' }}</span>
+                    </template>
+                    <span v-else>🤖</span>
+                  </div>
+                  <div class="msg-content">
+                    <div v-if="msg.role === 'assistant' && msg.streaming" class="user-text" style="white-space:pre-wrap">{{ msg.content }}</div>
+                    <div v-else-if="msg.role === 'assistant'" class="markdown-body" v-html="renderMarkdown(msg.content)"></div>
+                    <!-- RAG 引用来源（站内跳转，环境自适应：本地测跳本地、线上跳线上） -->
+                    <div v-if="msg.role === 'assistant' && msg.citations && msg.citations.length" class="rag-citations">
+                      <span class="cit-label">📎 参考来源：</span>
+                      <router-link
+                        v-for="(c, ci) in msg.citations"
+                        :key="ci"
+                        :to="citPath(c.link)"
+                        class="cit-link"
+                        :title="'相似度 ' + ((1 - c.distance) * 100).toFixed(0) + '%'"
+                      >{{ c.title }}</router-link>
+                    </div>
+                    <div v-else class="user-text">{{ msg.content }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 加载中 -->
+              <div v-if="aiLoading" class="msg-row assistant">
+                <div class="msg-bubble assistant typing">
+                  <div class="msg-avatar">🤖</div>
+                  <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="chat-input-area">
+              <textarea
+                ref="aiInputRef"
+                v-model="aiInput"
+                class="chat-input"
+                placeholder="输入消息，Enter 发送，Shift+Enter 换行..."
+                rows="1"
+                @keydown="aiOnKeydown"
+                @input="aiAutoResize"
+                :disabled="aiLoading"
+              ></textarea>
+              <button
+                class="btn-send"
+                :disabled="!aiInput.trim() || aiLoading"
+                @click="aiSendMessage()"
+                title="发送 (Enter)"
+              >
+                <span v-if="!aiLoading">↑</span>
+                <span v-else class="spinner"></span>
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- ====== 视图 G：写文章编辑器（/write 路由） ====== -->
+        <template v-if="isEditorPage">
+          <!-- Tab 行 -->
+          <div class="list-header card">
+            <div class="tab-group">
+              <button
+                class="tab-pill home-pill"
+                :class="{ active: activeTab === 'home' }"
+                @click="goHome"
+                title="回到首页"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tab-pill-icon"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+              </button>
+              <button
+                v-for="tab in tabs"
+                :key="tab.key"
+                class="tab-pill"
+                :class="{ active: activeTab === tab.key }"
+                @click="selectTab(tab.key)"
+              >
+                {{ tab.label }}
+                <span v-if="tab.count !== undefined" class="tab-pill-count">{{ tab.count }}</span>
+              </button>
+            </div>
+            <router-link to="/category" class="more-link">更多 →</router-link>
+          </div>
+
+          <!-- 编辑器卡片 -->
+          <div class="editor-wrap card">
+            <!-- 标题栏：写新文章 + 取消/发布按钮 -->
+            <div class="editor-header-row">
+              <h2 class="editor-heading">写新文章</h2>
+              <div class="editor-actions-row">
+                <span v-if="draftSavedAt" class="draft-tip">已自动保存 {{ draftSavedAt ? formatDraftTime(draftSavedAt) : '' }}</span>
+                <button class="btn-editor btn-editor-outline" @click="$router.push('/')">取消</button>
+                <button class="btn-editor btn-editor-primary" @click="editorPublish" :disabled="editorPublishing">
+                  {{ editorPublishing ? '发布中...' : '发布' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 草稿恢复提示 -->
+            <div v-if="hasRestoredDraft" class="draft-restore-bar">
+              已恢复上次未发布的草稿
+              <button class="draft-discard" @click="discardDraft">放弃草稿</button>
+            </div>
+
+            <!-- 文章标题输入 -->
+            <input type="text" class="editor-title-input" v-model="editorTitle" @input="onEditorInput" placeholder="文章标题..." />
+
+            <!-- 标签选择行 -->
+            <div class="editor-meta-row">
+              <select v-model="editorTag" class="editor-select" @change="onEditorInput">
+                <option value="">选择标签</option>
+                <option v-for="t in PREDEFINED_TAGS" :key="t" :value="t">{{ t }}</option>
+              </select>
+              <input type="text" v-model="editorExtraTags" @input="onEditorInput" placeholder="自定义标签（逗号分隔）" class="editor-extra-input" />
+            </div>
+
+            <!-- 工具栏 -->
+            <div class="editor-toolbar">
+              <button class="toolbar-btn" title="加粗" @click="editorInsert('**', '**')"><b>B</b></button>
+              <button class="toolbar-btn" title="斜体" @click="editorInsert('*', '*')"><i>I</i></button>
+              <button class="toolbar-btn" title="标题" @click="editorInsert('## ', '')">H</button>
+              <button class="toolbar-btn" title="代码块" @click="editorInsert('```\n', '\n```')">{ }</button>
+              <button class="toolbar-btn" title="行内代码" @click="editorInsert('`', '`')">`</button>
+              <button class="toolbar-btn" title="引用" @click="editorInsert('> ', '')">❝</button>
+              <button class="toolbar-btn" title="无序列表" @click="editorInsert('- ', '')">•</button>
+              <button class="toolbar-btn" title="有序列表" @click="editorInsert('1. ', '')">1.</button>
+              <button class="toolbar-btn" title="分割线" @click="editorInsert('\n---\n', '')">—</button>
+              <button class="toolbar-btn toolbar-img" title="插入图片" @click="triggerImageUpload" :disabled="uploadingImage">
+                <span v-if="uploadingImage">{{ uploadProgress }}%</span>
+                <span v-else>🖼️</span>
+              </button>
+              <input ref="imageInputRef" type="file" accept="image/*" hidden @change="onImageSelected" />
+            </div>
+
+            <!-- Markdown 内容区 -->
+            <textarea
+              ref="editorRef"
+              class="editor-textarea"
+              v-model="editorContent"
+              @input="onEditorInput"
+              placeholder="用 Markdown 写下你的内容...&#10;&#10;## 一级标题&#10;&#10;正文内容..."
+            ></textarea>
+          </div>
+        </template>
+
+        <template v-if="isCategoryPage">
+          <!-- Tab 行（🏠 归档 / 技术 / 二次元） -->
+          <div class="list-header card">
+            <div class="tab-group">
+              <button
+                class="tab-pill home-pill"
+                :class="{ active: activeTab === 'home' && !isCategoryPage }"
+                @click="goHome"
+                title="回到首页"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tab-pill-icon"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+              </button>
+              <button
+                v-for="tab in tabs"
+                :key="tab.key"
+                class="tab-pill"
+                :class="{ active: activeTab === tab.key }"
+                @click="selectTab(tab.key)"
+              >
+                <svg v-if="tab.key === 'archive'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tab-pill-icon"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2 2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+                {{ tab.label }}
+                <span v-if="tab.count !== undefined" class="tab-pill-count">{{ tab.count }}</span>
+              </button>
+            </div>
+            <!-- 文章下拉菜单（归档 / 分类 / 标签） -->
+            <div class="home-post-menu" ref="postMenuRef">
+              <button
+                class="home-post-menu-btn"
+                :class="{ active: showPostMenu }"
+                @click="togglePostMenu"
+              >
+                <span class="link-icon">📄</span> 文章
+                <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg>
+              </button>
+              <transition name="fade">
+                <Teleport to="body">
+                  <div v-if="showPostMenu" class="post-dropdown-menu" :style="postMenuStyle" @click.stop>
+                    <router-link to="/?view=archive" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                      <span>归档</span>
+                    </router-link>
+                    <router-link to="/category" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                      <span>分类</span>
+                    </router-link>
+                    <router-link to="/tags" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                      <span>标签</span>
+                    </router-link>
+                  </div>
+                </Teleport>
+              </transition>
+            </div>
+          </div>
+
+          <!-- 标题栏 -->
+          <div class="list-header card cat-overview-header">
+            <h2 class="cat-overview-title">分类</h2>
+            <p class="cat-overview-sub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cat-sub-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              全部分类 · {{ totalPosts || recentPosts.length }} 篇文章
+            </p>
+          </div>
+
+          <!-- 分类卡片网格 -->
+          <div class="cat-grid">
+            <div
+              v-for="(cat, i) in fixedCategories"
+              :key="cat.name"
+              class="cat-card"
+              :style="{ animationDelay: i * 0.06 + 's' }"
+              @click="activeTab = cat.name; $router.push({ path: '/', query: { cat: cat.name } })"
+            >
+              <div class="cat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="cat-info">
+                <h3 class="cat-name">{{ cat.name }}</h3>
+                <span class="cat-count">{{ cat.count }} 篇文章</span>
+              </div>
+              <div class="cat-arrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="!fixedCategories.length" class="empty-state">
+            <span class="empty-icon">📂</span>
+            <p>还没有任何分类</p>
+          </div>
+        </template>
+
         <!-- ====== 视图 E：标签总览（/tags）或 标签筛选（/?tag=xxx） ====== -->
         <template v-if="isTagsPage && !isDetailPage">
           <!-- Tab 行 -->
@@ -171,7 +629,35 @@
                 <span v-if="tab.count !== undefined" class="tab-pill-count">{{ tab.count }}</span>
               </button>
             </div>
-            <router-link to="/tags" class="more-link" :class="{ 'more-pill': isTagsPage && !activeTag }">更多 →</router-link>
+            <!-- 文章下拉菜单（归档 / 分类 / 标签） -->
+            <div class="home-post-menu" ref="postMenuRef">
+              <button
+                class="home-post-menu-btn"
+                :class="{ active: showPostMenu }"
+                @click="togglePostMenu"
+              >
+                <span class="link-icon">📄</span> 文章
+                <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg>
+              </button>
+              <transition name="fade">
+                <Teleport to="body">
+                  <div v-if="showPostMenu" class="post-dropdown-menu" :style="postMenuStyle" @click.stop>
+                    <router-link to="/?view=archive" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                      <span>归档</span>
+                    </router-link>
+                    <router-link to="/category" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                      <span>分类</span>
+                    </router-link>
+                    <router-link to="/tags" class="pd-item" @click="closePostMenu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                      <span>标签</span>
+                    </router-link>
+                  </div>
+                </Teleport>
+              </transition>
+            </div>
           </div>
 
           <!-- 标签总览页（/tags，无 tag 参数） -->
@@ -286,14 +772,75 @@
               <span v-if="tab.count !== undefined" class="tab-pill-count">{{ tab.count }}</span>
             </button>
           </div>
-          <router-link to="/category" class="more-link">更多 →</router-link>
+          <!-- 文章下拉菜单（归档 / 分类 / 标签） -->
+          <div class="home-post-menu" ref="postMenuRef">
+            <button
+              class="home-post-menu-btn"
+              :class="{ active: showPostMenu }"
+              @click="togglePostMenu"
+            >
+              <span class="link-icon">📄</span> 文章
+              <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg>
+            </button>
+            <transition name="fade">
+              <Teleport to="body">
+                <div v-if="showPostMenu" class="post-dropdown-menu" :style="postMenuStyle" @click.stop>
+                  <router-link to="/?view=archive" class="pd-item" @click="closePostMenu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                    <span>归档</span>
+                  </router-link>
+                  <router-link to="/category" class="pd-item" @click="closePostMenu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 0 01-2-2V5a2 0 012-2h5l2 3h9a2 0 012 2z"/></svg>
+                    <span>分类</span>
+                  </router-link>
+                  <router-link to="/tags" class="pd-item" @click="closePostMenu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    <span>标签</span>
+                  </router-link>
+                </div>
+              </Teleport>
+            </transition>
+          </div>
+        </div>
+
+        <!-- 首页搜索栏 -->
+        <div class="home-search-bar card" v-if="activeTab === 'home'">
+          <div class="search-input-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              ref="searchInputRef"
+              type="text"
+              v-model="searchKeyword"
+              placeholder="搜索文章标题、标签... ( / 或 Ctrl+K 快速聚焦 )"
+              class="search-input"
+              @input="activeSearchTag = ''"
+            />
+            <button v-if="searchKeyword || activeSearchTag" class="search-clear" @click="clearSearch" title="清除">✕</button>
+          </div>
+          <div class="search-tag-chips" v-if="allTags.length > 1">
+            <button
+              class="st-chip"
+              :class="{ active: !activeSearchTag }"
+              @click="activeSearchTag = ''"
+            >全部</button>
+            <button
+              v-for="tag in allTags.filter(t => t !== 'all')"
+              :key="tag"
+              class="st-chip"
+              :class="{ active: activeSearchTag === tag }"
+              @click="selectSearchTag(tag)"
+            >#{{ tag }}</button>
+          </div>
+          <div class="search-info" v-if="searchKeyword.trim() || activeSearchTag">
+            找到 <strong>{{ searchFilteredPosts.length }}</strong> 篇相关文章
+          </div>
         </div>
 
         <!-- 视图 H：首页卡片列表（activeTab === 'home'） -->
         <div v-if="activeTab === 'home'" class="post-list">
-          <template v-if="filteredPosts.length">
+          <template v-if="searchFilteredPosts.length">
             <article
-              v-for="(post, i) in filteredPosts"
+              v-for="(post, i) in searchFilteredPosts"
               :key="post.id"
               class="post-card"
               :style="{ animationDelay: i * 0.06 + 's' }"
@@ -301,15 +848,15 @@
             >
               <div class="post-accent-bar"></div>
               <div class="post-body">
-                <h3 class="post-title">{{ post.title }}</h3>
+                <h3 class="post-title" v-html="highlightText(post.title, kwLower)"></h3>
                 <div class="post-meta-row">
                   <span class="meta-item"><svg class="meta-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {{ post.date || '1970-01-01' }}</span>
                   <span class="meta-sep">|</span>
                   <span class="meta-item"><svg class="meta-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg> {{ (post.tags || []).some(t => TECH_TAGS.includes(t)) ? '技术' : '二次元' }}</span>
                 </div>
-                <p class="post-excerpt">{{ post.excerpt || '暂无摘要...' }}</p>
+                <p class="post-excerpt" v-html="highlightText(post.excerpt, kwLower) || '暂无摘要...'"></p>
                 <div class="post-tag-row">
-                  <span v-for="t in (post.tags || []).slice(0, 5)" :key="t" class="post-hash-tag">#{{ t }}</span>
+                  <span v-for="t in (post.tags || []).slice(0, 5)" :key="t" class="post-hash-tag" v-html="highlightText('#' + t, kwLower)"></span>
                 </div>
               </div>
               <div v-if="post.cover_image" class="post-cover">
@@ -321,9 +868,10 @@
             </article>
           </template>
           <div v-else class="empty-state">
-            <span class="empty-icon">📭</span>
-            <p>还没有发布任何文章</p>
-            <button class="btn-empty" @click="$router.push('/write')" v-if="isLoggedIn">写第一篇 →</button>
+            <span class="empty-icon">{{ searchKeyword.trim() || activeSearchTag ? '🔍' : '📭' }}</span>
+            <p>{{ searchKeyword.trim() || activeSearchTag ? '没有找到匹配的文章' : '还没有发布任何文章' }}</p>
+            <button class="btn-empty" @click="$router.push('/write')" v-if="isLoggedIn && !(searchKeyword.trim() || activeSearchTag)">写第一篇 →</button>
+            <button class="btn-empty" @click="clearSearch" v-if="searchKeyword.trim() || activeSearchTag">清除搜索</button>
           </div>
         </div>
 
@@ -420,6 +968,19 @@
 
       <!-- 右侧：统计 + 信息 -->
       <aside class="sidebar-right">
+        <!-- 文章目录（仅详情页） -->
+        <div class="card toc-card" v-if="isDetailPage && toc.length">
+          <h4 class="card-title-sm">目录</h4>
+          <ul class="toc-list">
+            <li
+              v-for="item in toc"
+              :key="item.id"
+              :class="['toc-item', 'toc-level-' + item.level, { active: activeId === item.id }]"
+              @click="scrollToHeading(item.id)"
+            >{{ item.text }}</li>
+          </ul>
+        </div>
+
         <!-- 最新动态（mock） -->
         <div class="card activity-card">
           <div class="activity-header">
@@ -518,12 +1079,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, reactive, nextTick, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchPosts, fetchPostById, deletePost, createPost } from '../api/posts'
+import { fetchPosts, fetchPostById, deletePost, createPost, uploadImage } from '../api/posts'
 import { chatWithAIStream, fetchAIHistory, clearAIHistory } from '../api/ai'
 import { apiUrl } from '../config'
 import { useUserStore } from '../store'
 import CommentSection from '../components/CommentSection.vue'
-import { renderMarkdown } from '../utils/markdown.js'
+import { renderMarkdown, enhanceCodeBlocks, enhanceImages, extractToc } from '../utils/markdown.js'
+import { setMeta, resetMeta } from '../utils/meta.js'
 
 const route = useRoute()
 const $router = useRouter()
@@ -543,6 +1105,36 @@ const yearCollapsed = ref(false)
 
 function toggleYearCollapse() {
   yearCollapsed.value = !yearCollapsed.value
+}
+
+// 主页「文章」下拉菜单（归档 / 分类 / 标签）
+const showPostMenu = ref(false)
+const postMenuRef = ref(null)
+const postMenuStyle = ref({})
+function updatePostMenuPosition() {
+  const btn = postMenuRef.value
+  if (!btn) return
+  const rect = btn.getBoundingClientRect()
+  postMenuStyle.value = {
+    top: `${rect.bottom + 8}px`,
+    left: `${rect.left}px`,
+    minWidth: `${rect.width}px`
+  }
+}
+function togglePostMenu() {
+  showPostMenu.value = !showPostMenu.value
+  if (showPostMenu.value) {
+    nextTick(() => updatePostMenuPosition())
+  }
+}
+function closePostMenu() { showPostMenu.value = false }
+function onDocClickClosePostMenu(e) {
+  if (showPostMenu.value && postMenuRef.value && !postMenuRef.value.contains(e.target)) {
+    showPostMenu.value = false
+  }
+}
+function onScrollResizeClosePostMenu() {
+  showPostMenu.value = false
 }
 
 // 切换到指定 tab（中间栏 + 顶部导航栏共用，保证视图一致）
@@ -733,6 +1325,10 @@ const viewKey = computed(() => {
   if (isTagsPage.value) return route.query.tag ? 'tag-' + route.query.tag : 'tags'
   return 'home'
 })
+// 进入写文章页时尝试恢复上次未发布的草稿
+watch(isEditorPage, (val) => {
+  if (val) restoreDraft()
+})
 const heroTitle = computed(() => {
   if (isEditorPage.value) return '写新文章'
   if (isDetailPage.value) return detailPost.value?.title || '文章详情'
@@ -750,6 +1346,28 @@ const heroTitle = computed(() => {
 const detailPost = ref(null)
 const renderedContent = ref('')
 const detailLoading = ref(false)
+const detailBodyRef = ref(null)
+const readProgress = ref(0)
+const toc = ref([])
+const activeId = ref('')
+
+// 阅读进度：根据文章元素在视口中的位置比例计算 0~100
+function updateReadProgress() {
+  const el = detailBodyRef.value
+  if (!el) {
+    readProgress.value = 0
+    return
+  }
+  const rect = el.getBoundingClientRect()
+  const vh = window.innerHeight || document.documentElement.clientHeight
+  const total = rect.height - vh
+  if (total <= 0) {
+    readProgress.value = rect.top <= 0 ? 100 : 0
+    return
+  }
+  const p = (-rect.top / total) * 100
+  readProgress.value = Math.max(0, Math.min(100, p))
+}
 
 // 详情页字数 / 阅读时间
 const detailWordCount = computed(() => {
@@ -902,13 +1520,95 @@ function aiClearChat() {
 }
 
 // ========== 写文章编辑器 ==========
-const TAG_MAP = { 'Python': 1, 'AI': 2, 'Vue': 3, 'FastAPI': 4, 'Docker': 5, '其他': 6 }
+const TAG_MAP = { 'Python': 1, 'AI': 2, 'Vue': 3, 'FastAPI': 4, 'Docker': 5 }
 const editorTitle = ref('')
 const editorContent = ref('')
 const editorTag = ref('')
 const editorExtraTags = ref('')
 const editorRef = ref(null)
 const editorPublishing = ref(false)
+const imageInputRef = ref(null)
+const uploadingImage = ref(false)
+const uploadProgress = ref(0)
+
+// ====== 写文章草稿自动保存（localStorage，防意外刷新/关页丢失）======
+const DRAFT_KEY = 'blog_write_draft_v1'
+const draftSavedAt = ref(0)          // 上次保存时间戳，用于显示「已保存」
+const hasRestoredDraft = ref(false)  // 本次会话是否从草稿恢复过
+
+function saveDraft() {
+  const t = editorTitle.value.trim()
+  const c = editorContent.value.trim()
+  const tag = editorTag.value
+  const extra = editorExtraTags.value.trim()
+  // 全空不写草稿（避免空草稿覆盖有效内容）
+  if (!t && !c && !tag && !extra) {
+    localStorage.removeItem(DRAFT_KEY)
+    draftSavedAt.value = 0
+    return
+  }
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      title: editorTitle.value,
+      content: editorContent.value,
+      tag: editorTag.value,
+      extra: editorExtraTags.value,
+      savedAt: Date.now(),
+    }))
+    draftSavedAt.value = Date.now()
+  } catch (e) { /* 忽略写入异常（如隐私模式） */ }
+}
+
+function restoreDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return
+    const d = JSON.parse(raw)
+    // 只有标题或正文非空才恢复，否则视为空草稿
+    if (!d.title && !d.content) { localStorage.removeItem(DRAFT_KEY); return }
+    editorTitle.value = d.title || ''
+    editorContent.value = d.content || ''
+    editorTag.value = d.tag || ''
+    editorExtraTags.value = d.extra || ''
+    hasRestoredDraft.value = true
+    draftSavedAt.value = d.savedAt || 0
+  } catch (e) { /* 忽略解析异常 */ }
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY)
+  draftSavedAt.value = 0
+}
+
+// 编辑时自动存草稿（防抖 800ms）
+let draftTimer = null
+function onEditorInput() {
+  if (draftTimer) clearTimeout(draftTimer)
+  draftTimer = setTimeout(saveDraft, 800)
+}
+
+// 放弃恢复来的草稿
+function discardDraft() {
+  clearDraft()
+  editorTitle.value = ''
+  editorContent.value = ''
+  editorTag.value = ''
+  editorExtraTags.value = ''
+  hasRestoredDraft.value = false
+}
+
+// 把保存时间戳格式化成「刚刚 / x 分钟前 / HH:MM」
+function formatDraftTime(ts) {
+  if (!ts) return ''
+  const diff = Date.now() - ts
+  if (diff < 1000 * 10) return '刚刚'
+  if (diff < 1000 * 60) return Math.floor(diff / 1000) + ' 秒前'
+  if (diff < 1000 * 60 * 60) return Math.floor(diff / 60000) + ' 分钟前'
+  const d = new Date(ts)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return hh + ':' + mm
+}
 
 function editorInsert(before, after) {
   const ta = editorRef.value
@@ -918,6 +1618,41 @@ function editorInsert(before, after) {
   editorContent.value = editorContent.value.slice(0, s) + before + sel + after + editorContent.value.slice(e)
   const caret = s + before.length
   setTimeout(() => { ta.selectionStart = caret; ta.selectionEnd = caret + sel.length; ta.focus() }, 0)
+}
+
+// ====== 图片上传 ======
+function triggerImageUpload() {
+  if (uploadingImage.value) return
+  imageInputRef.value?.click()
+}
+
+async function onImageSelected(e) {
+  const file = e.target.files?.[0]
+  // 清空 value，保证同一文件能再次选择
+  e.target.value = ''
+  if (!file) return
+  if (!/^image\//.test(file.type)) {
+    window.alert('请选择图片文件')
+    return
+  }
+  // 限制体积 10MB
+  if (file.size > 10 * 1024 * 1024) {
+    window.alert('图片不能超过 10MB')
+    return
+  }
+  uploadingImage.value = true
+  uploadProgress.value = 0
+  try {
+    const url = await uploadImage(file, (p) => { uploadProgress.value = p })
+    const snippet = `![${file.name.replace(/\.[^.]+$/, '')}](${url})`
+    editorInsert(snippet, '')
+    onEditorInput()
+  } catch (err) {
+    window.alert(err.message || '图片上传失败')
+  } finally {
+    uploadingImage.value = false
+    uploadProgress.value = 0
+  }
 }
 
 async function editorPublish() {
@@ -931,22 +1666,90 @@ async function editorPublish() {
   editorExtraTags.value.split(',').forEach(t => {
     const tt = t.trim(); if (tt) tags.push(tt)
   })
-  if (!tags.length) tags.push('其他')
 
   try {
     editorPublishing.value = true
     const tagIds = tags.map(t => TAG_MAP[t]).filter(id => id != null)
-    await createPost({ title: t, content: c, tag_ids: tagIds })
+    await createPost({ title: t, content: c, user_id: 1, tag_ids: tagIds })
     editorTitle.value = ''
     editorContent.value = ''
     editorTag.value = ''
     editorExtraTags.value = ''
+    clearDraft()
+    hasRestoredDraft.value = false
     alert('文章发布成功 🎉')
     setTimeout(() => $router.push('/'), 600)
   } catch (e) {
     alert(e.message || '发布失败')
   } finally {
     editorPublishing.value = false
+  }
+}
+
+// ====== 首页搜索 ======
+const searchKeyword = ref('')
+const activeSearchTag = ref('')
+
+// 搜索过滤后的文章（在 filteredPosts 基础上再按关键词/标签筛）
+const searchFilteredPosts = computed(() => {
+  let list = filteredPosts.value
+  // 标签筛选
+  if (activeSearchTag.value) {
+    list = list.filter(p => (p.tags || []).includes(activeSearchTag.value))
+  }
+  // 关键词筛选
+  const kw = searchKeyword.value.trim().toLowerCase()
+  if (kw) {
+    list = list.filter(p =>
+      (p.title || '').toLowerCase().includes(kw) ||
+      (p.excerpt || '').toLowerCase().includes(kw) ||
+      (p.tags || []).some(t => t.toLowerCase().includes(kw))
+    )
+  }
+  return list
+})
+
+function clearSearch() {
+  searchKeyword.value = ''
+  activeSearchTag.value = ''
+}
+
+function selectSearchTag(tag) {
+  activeSearchTag.value = activeSearchTag.value === tag ? '' : tag
+}
+
+// 搜索关键词（小写，用于高亮匹配）
+const kwLower = computed(() => searchKeyword.value.trim().toLowerCase())
+
+// 转义 HTML 特殊字符，避免高亮拼接时引入 XSS
+function escapeHtml(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+// 在纯文本中高亮关键词（先转义再做包裹，安全）
+function highlightText(text, kw) {
+  if (!text) return ''
+  const escaped = escapeHtml(text)
+  if (!kw) return escaped
+  const re = new RegExp('(' + escapeRegExp(escapeHtml(kw)) + ')', 'gi')
+  return escaped.replace(re, '<mark class="search-hl">$1</mark>')
+}
+
+// 键盘快捷键聚焦搜索框：/ 或 Ctrl+K
+const searchInputRef = ref(null)
+function onSearchHotkey(e) {
+  const tag = (e.target && e.target.tagName) || ''
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)
+  if ((e.key === '/' && !typing) || (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey))) {
+    e.preventDefault()
+    if (activeTab.value !== 'home') activeTab.value = 'home'
+    nextTick(() => searchInputRef.value && searchInputRef.value.focus())
   }
 }
 
@@ -1010,8 +1813,8 @@ const archiveYear = computed(() => {
   return firstDate ? firstDate.slice(0, 4) : String(new Date().getFullYear())
 })
 
-// 固定 6 个标签（与后端 init_db 一致）
-const PREDEFINED_TAGS = ['Python', 'AI', 'Vue', 'Docker', 'FastAPI', '其他']
+// 固定标签（与后端 init_db 一致）
+const PREDEFINED_TAGS = ['Python', 'AI', 'Vue', 'Docker', 'FastAPI']
 
 // 标签英文名 → 中文显示名
 const TAG_LABELS = {
@@ -1019,8 +1822,7 @@ const TAG_LABELS = {
   AI: 'AI应用',
   Vue: 'Vue',
   Docker: 'Docker',
-  FastAPI: 'FastAPI',
-  其他: '其他'
+  FastAPI: 'FastAPI'
 }
 
 // 所有标签（固定 6 个 + 文章实际使用的）
@@ -1222,6 +2024,22 @@ async function loadDetail() {
       author: 'Firefly',
     }
     renderedContent.value = renderMarkdown(blog.content || '')
+    toc.value = extractToc(blog.content || '')
+    activeId.value = ''
+    await nextTick()
+    enhanceCodeBlocks(detailBodyRef.value)
+    enhanceImages(detailBodyRef.value)
+    onTocScroll()
+    // SEO / 社交分享卡片：动态设置 meta
+    const plain = (blog.content || '').replace(/[#>*`!\[\]()_~]/g, ' ').replace(/\s+/g, ' ').trim()
+    const imgMatch = (blog.content || '').match(/!\[[^\]]*\]\(([^)\s]+)\)/)
+    const firstImg = imgMatch ? imgMatch[1] : (blog.cover_image || '')
+    setMeta({
+      title: blog.title,
+      description: plain.slice(0, 120),
+      image: firstImg,
+      url: window.location.href,
+    })
   } catch (e) {
     console.error('[HomePage] 加载详情失败', e)
     detailPost.value = null
@@ -1229,6 +2047,44 @@ async function loadDetail() {
     detailLoading.value = false
   }
 }
+
+// 目录滚动高亮：取最后一个顶部越过偏移线的标题
+function onTocScroll() {
+  if (!toc.value.length) return
+  const offset = 120
+  let current = ''
+  for (const item of toc.value) {
+    const el = document.getElementById(item.id)
+    if (!el) continue
+    if (el.getBoundingClientRect().top <= offset) current = item.id
+    else break
+  }
+  if (current) activeId.value = current
+}
+
+function scrollToHeading(id) {
+  const el = document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// 相关文章：与当前文章标签重合度排序；无重合则退化为最新文章
+const relatedPosts = computed(() => {
+  if (!detailPost.value?.id || !recentPosts.value.length) return []
+  const myId = String(detailPost.value.id)
+  const myTags = detailPost.value.tags || []
+  return recentPosts.value
+    .filter((p) => String(p.id) !== myId)
+    .map((p) => ({
+      ...p,
+      overlap: (p.tags || []).filter((t) => myTags.includes(t)).length,
+    }))
+    .sort(
+      (a, b) =>
+        b.overlap - a.overlap ||
+        (b.create_time || '').localeCompare(a.create_time || '')
+    )
+    .slice(0, 4)
+})
 
 // 删除文章（详情页用）
 function handleDeleteDetail() {
@@ -1242,6 +2098,42 @@ function handleDeleteDetail() {
       $router.push('/')
     })
     .catch(() => toast('删除失败', 'error'))
+}
+
+// 分享文章：移动端唤起系统分享面板，桌面端复制「标题 + 链接」
+function sharePost() {
+  const url = window.location.href
+  const title = detailPost.value?.title || ''
+  const text = `《${title}》`
+  if (navigator.share) {
+    navigator.share({ title, text, url }).catch(() => {})
+    return
+  }
+  const payload = `${text} ${url}`
+  const done = () => toast('链接已复制 ✓', 'success')
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(payload).then(done).catch(() => fallbackShare(payload, done))
+  } else {
+    fallbackShare(payload, done)
+  }
+}
+
+function fallbackShare(text, done) {
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.position = 'fixed'
+  ta.style.top = '-9999px'
+  ta.style.opacity = '0'
+  document.body.appendChild(ta)
+  ta.focus()
+  ta.select()
+  try {
+    document.execCommand('copy')
+    done()
+  } catch (e) {
+    /* ignore */
+  }
+  document.body.removeChild(ta)
 }
 
 // 拉取音乐列表：接后端 /api/music/list，失败则保留 demo 数据兜底
@@ -1263,12 +2155,33 @@ onMounted(() => {
   if (isDetailPage.value) loadDetail()
   fetchMusicList()
   loadAIHistory()
+  document.addEventListener('click', onDocClickClosePostMenu)
+  window.addEventListener('resize', onScrollResizeClosePostMenu)
+  window.addEventListener('scroll', onScrollResizeClosePostMenu, true)
+  window.addEventListener('scroll', onWindowScroll)
+  window.addEventListener('resize', onWindowScroll)
+  window.addEventListener('keydown', onSearchHotkey)
+  onWindowScroll()
 })
 
 // 切到 AI 页时（如登录后进入）补拉历史，覆盖 onMounted 时尚未登录的情况
 watch(isAIPage, (val) => {
   if (val) loadAIHistory()
 })
+
+// AI 消息渲染后给代码块加行号 + 复制按钮（v-html 无法在模板绑事件，用 DOM 增强）
+watch(aiMessages, () => {
+  nextTick(() => {
+    enhanceCodeBlocks(aiMsgContainer.value)
+    enhanceImages(aiMsgContainer.value)
+  })
+}, { deep: true })
+
+// 统一的详情页滚动处理：进度条 + 目录高亮
+function onWindowScroll() {
+  updateReadProgress()
+  if (isDetailPage.value) onTocScroll()
+}
 
 // 监听路由变化（同组件导航 query 变化不会重新挂载，需监听 fullPath）
 watch(() => route.fullPath, () => {
@@ -1291,6 +2204,7 @@ watch(() => route.fullPath, () => {
   } else {
     detailPost.value = null
     renderedContent.value = ''
+    resetMeta() // 离开详情页恢复站点默认 meta
     // 回到列表页（如发布/编辑文章后跳转）时重新拉取最新文章，免去手动刷新
     loadData()
   }
@@ -1299,6 +2213,12 @@ watch(() => route.fullPath, () => {
 onUnmounted(() => {
   audio.pause()
   audio.src = ''
+  document.removeEventListener('click', onDocClickClosePostMenu)
+  window.removeEventListener('resize', onScrollResizeClosePostMenu)
+  window.removeEventListener('scroll', onScrollResizeClosePostMenu, true)
+  window.removeEventListener('scroll', onWindowScroll)
+  window.removeEventListener('resize', onWindowScroll)
+  window.removeEventListener('keydown', onSearchHotkey)
 })
 
 function formatPosts(rows) {
@@ -1315,8 +2235,15 @@ function formatPosts(rows) {
         tags: [],
       })
     }
-    if (row.name && !map.get(blog.id).tags.includes(row.name)) {
-      map.get(blog.id).tags.push(row.name)
+    // 兼容两种后端返回：旧嵌套 {Blog, name} 与最新扁平 BlogResponse（tags_name 数组）
+    const candidates = []
+    if (row.name) candidates.push(row.name)
+    const flatNames = blog.tags_name || []
+    for (const n of flatNames) candidates.push(n)
+    for (const name of candidates) {
+      if (name && !map.get(blog.id).tags.includes(name)) {
+        map.get(blog.id).tags.push(name)
+      }
     }
   }
   return Array.from(map.values()).map(blog => {
@@ -1646,6 +2573,9 @@ html[data-theme='dark'] .soc-icon:hover {
   justify-content: space-between;
   padding: 0.6rem 1rem;
   margin-bottom: 1rem;
+  position: relative;
+  overflow: visible;
+  z-index: 300;
 }
 .tab-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .tab-pill {
@@ -1704,6 +2634,137 @@ html[data-theme='dark'] .soc-icon:hover {
   color: #fff !important;
 }
 .more-link.small { font-size: 12px; }
+
+/* ===== 主页「文章」下拉菜单（归档 / 分类 / 标签） ===== */
+.home-post-menu { position: relative; margin-left: 0.6rem; z-index: 300; }
+.home-post-menu-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 14px; font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent; border: none; cursor: pointer;
+  border-radius: 8px; transition: all var(--transition);
+  white-space: nowrap;
+}
+.home-post-menu-btn:hover,
+.home-post-menu-btn.active {
+  color: var(--primary); background: var(--primary-bg);
+}
+.home-post-menu-btn .link-icon { font-size: 15px; opacity: 0.7; }
+.caret { width: 14px; height: 14px; transition: transform 0.2s; flex-shrink: 0; }
+.home-post-menu-btn.active .caret { transform: rotate(180deg); }
+
+.post-dropdown-menu {
+  position: fixed;
+  min-width: 150px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 0.4rem 0;
+  z-index: 9999;
+}
+.pd-item {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.55rem 0.9rem;
+  font-size: 13px; color: var(--text-secondary);
+  text-decoration: none; cursor: pointer;
+  transition: all 0.15s;
+}
+.pd-item svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--text-secondary); transition: color 0.15s; }
+.pd-item:hover { background: var(--bg-body); color: var(--primary); }
+.pd-item:hover svg { color: var(--primary); }
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-6px); }
+
+/* ========== 首页搜索栏 ========== */
+.home-search-bar {
+  padding: 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.2rem;
+}
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-body);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 0.75rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input-wrap:focus-within {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+}
+.search-icon {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text);
+  padding: 0.6rem 0;
+  line-height: 1.4;
+}
+.search-input::placeholder { color: var(--text-muted); }
+.search-clear {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-muted);
+  padding: 0.2rem 0.3rem;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+}
+.search-clear:hover { background: var(--border-strong); color: var(--text); }
+.search-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.st-chip {
+  font-size: 12px;
+  padding: 0.2rem 0.65rem;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.st-chip:hover { border-color: var(--primary); color: var(--primary); }
+.st-chip.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.search-info {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 0.2rem;
+}
+.search-info strong { color: var(--text); font-weight: 600; }
+
+/* 搜索关键词高亮 */
+.search-hl {
+  background: rgba(250, 204, 21, 0.35);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 600;
+}
 
 /* ========== 文章卡片（Firefly 风格）========== */
 .post-list { display: flex; flex-direction: column; gap: 1.2rem; }
@@ -1937,7 +2998,7 @@ html[data-theme='dark'] .timeline-track {
   display: flex;
   gap: 0;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-strong);
   position: relative;
 }
 .tl-date {
@@ -2045,7 +3106,7 @@ html[data-theme='dark'] .tl-post-item:hover {
   display: flex; align-items: center; gap: 0.6rem;
   font-size: 13.5px; color: var(--text-secondary);
   padding: 0.35rem 0;
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-strong);
 }
 .stat-item:last-child { border-bottom: none; }
 .stat-icon {
@@ -2067,7 +3128,7 @@ html[data-theme='dark'] .tl-post-item:hover {
 .cal-nav {
   width: 26px; height: 26px;
   border-radius: 6px;
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-strong);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -2331,6 +3392,7 @@ html[data-theme='dark'] .tl-post-item:hover { background: rgba(16,185,129,0.12);
 /* 响应式 */
 @media (max-width: 640px) {
   .cat-grid { grid-template-columns: 1fr; }
+  .related-grid { grid-template-columns: 1fr; }
 }
 
 /* ========== 文章详情视图（/posts/:id） ========== */
@@ -2362,12 +3424,35 @@ html[data-theme='dark'] .tl-post-item:hover { background: rgba(16,185,129,0.12);
   display: flex; align-items: stretch;
   padding: 0; margin-bottom: 0.8rem;
 }
+.title-row {
+  display: flex; align-items: center; gap: 1rem;
+  flex: 1; min-width: 0;
+}
 .detail-title {
   font-size: clamp(1.5rem, 2.8vw, 2rem); font-weight: 800;
   color: var(--text); line-height: 1.35;
-  padding: 1.4rem 1.5rem 1.3rem 1.2rem;
-  margin: 0;
+  padding: 1.4rem 0 1.3rem 1.2rem;
+  margin: 0; flex: 1; min-width: 0;
+  word-break: break-word;
 }
+.btn-share {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  margin-right: 1.2rem;
+  padding: 0.5rem 0.95rem;
+  font-size: 13px; font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-bg);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.btn-share:hover { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,0.25); }
+.share-icon { width: 15px; height: 15px; }
+
+/* meta 行 */
 
 /* meta 行 */
 .detail-meta-row {
@@ -2406,24 +3491,25 @@ html[data-theme='dark'] .tl-post-item:hover { background: rgba(16,185,129,0.12);
   font-size: 15.2px; line-height: 1.85;
   color: var(--text-secondary); word-break: break-word;
 }
-.detail-body :deep(h2), .detail-body :deep(h3) {
-  margin: 1.8em 0 0.75em; color: var(--text); font-weight: 700;
+.detail-body :deep(h2), .detail-body :deep(h3), .detail-body :deep(h4) {
+  scroll-margin-top: 90px; color: var(--text); font-weight: 700;
 }
 .detail-body :deep(h2) {
-  font-size: 1.48rem; padding-bottom: 0.35rem;
+  font-size: 1.48rem; margin: 1.8em 0 0.75em; padding-bottom: 0.35rem;
   border-bottom: 2px solid var(--primary-bg);
 }
-.detail-body :deep(h3) { font-size: 1.22rem; }
+.detail-body :deep(h3) { font-size: 1.22rem; margin: 1.5em 0 0.6em; }
+.detail-body :deep(h4) { font-size: 1.05rem; margin: 1.3em 0 0.5em; }
 .detail-body :deep(p) { margin: 0 0 1em; }
-.detail-body :deep(code) {
+.detail-body :deep(:not(pre) > code) {
   background: #f1f5f9; color: #be123c;
   padding: 0.15em 0.45em; border-radius: 5px; font-size: 13px;
 }
 .detail-body :deep(pre) {
-  background: #1e293b; border-radius: var(--radius);
-  padding: 1rem; overflow-x: auto; margin: 1em 0;
+  background: #282c34; border-radius: var(--radius);
+  padding: 0; overflow: hidden; margin: 1em 0;
 }
-.detail-body :deep(pre code) { background: none; padding: 0; color: #e2e8f0; }
+.detail-body :deep(pre code) { background: none; padding: 0; }
 .detail-body :deep(strong) { color: var(--text); font-weight: 700; }
 .detail-body :deep(blockquote) {
   border-left: 4px solid var(--primary);
@@ -2443,6 +3529,46 @@ html[data-theme='dark'] .tl-post-item:hover { background: rgba(16,185,129,0.12);
 }
 .detail-body :deep(th) { background: var(--bg-body); font-weight: 600; }
 
+/* 阅读进度条（顶部固定，随文章滚动比例填充） */
+.reading-progress {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--primary-light));
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.1s linear;
+  z-index: 1000; pointer-events: none;
+}
+
+/* 目录 TOC */
+.toc-card { padding: 1.2rem; }
+.toc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: calc(100vh - 180px); overflow-y: auto; }
+.toc-item {
+  font-size: 13px; line-height: 1.5; color: var(--text-dim); cursor: pointer;
+  padding: 0.32rem 0.6rem; border-radius: 6px; border-left: 2px solid transparent;
+  transition: all .18s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.toc-item:hover { color: var(--text); background: var(--primary-bg); }
+.toc-item.active { color: var(--primary); border-left-color: var(--primary); background: var(--primary-bg); font-weight: 600; }
+.toc-level-1 { padding-left: 0.6rem; font-weight: 600; }
+.toc-level-2 { padding-left: 1.4rem; }
+.toc-level-3 { padding-left: 2.2rem; font-size: 12px; }
+
+/* 相关文章 */
+.related-section { margin-top: 1.2rem; margin-bottom: 2.5rem; }
+.related-title { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 1.1rem; padding-left: 0.75rem; border-left: 3px solid var(--primary); }
+.related-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+.related-card {
+  display: block; padding: 1.25rem 1.35rem; border-radius: var(--radius-lg);
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm); transition: all .2s; text-decoration: none; overflow: hidden;
+}
+.related-card:hover { transform: translateY(-2px); border-color: var(--primary); box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
+.related-card-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 0.7rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; }
+.related-card-tags { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.7rem; }
+.related-tag { font-size: 11px; color: var(--primary); background: var(--primary-bg); padding: 0.15rem 0.55rem; border-radius: 10px; }
+.related-card-excerpt { font-size: 12px; color: var(--text-dim); line-height: 1.7; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
 /* 删除按钮 */
 .-detail-actions {
   display: flex; justify-content: flex-end; padding: 0.5rem 0.2rem;
@@ -2456,7 +3582,7 @@ html[data-theme='dark'] .tl-post-item:hover { background: rgba(16,185,129,0.12);
 .btn-delete:hover { background: #dc2626; color: #fff; }
 
 /* 详情暗色模式 */
-html[data-theme='dark'] .detail-body code {
+html[data-theme='dark'] .detail-body :deep(:not(pre) > code) {
   background: rgba(51,65,85,0.5); color: #fca5a5;
 }
 html[data-theme='dark'] .btn-delete {
@@ -2763,15 +3889,15 @@ html[data-theme='dark'] .hero-area::after {
 /* Markdown 内容样式 */
 .ai-chat-wrapper .markdown-body :deep(p) { margin: 0 0 0.5rem; }
 .ai-chat-wrapper .markdown-body :deep(p:last-child) { margin-bottom: 0; }
-.ai-chat-wrapper .markdown-body :deep(code) {
+.ai-chat-wrapper .markdown-body :deep(:not(pre) > code) {
   background: var(--primary-bg); color: #be123c; padding: 0.15em 0.4em;
   border-radius: 5px; font-size: 13px; font-family: 'Fira Code', monospace;
 }
 .ai-chat-wrapper .markdown-body :deep(pre) {
-  background: #1e293b; border: 1px solid #334155;
-  border-radius: 10px; padding: 0.85rem 1.1rem; overflow-x: auto; margin: 0.5rem 0;
+  background: #282c34; border: 1px solid #334155;
+  border-radius: 10px; padding: 0; overflow: hidden; margin: 0.5rem 0;
 }
-.ai-chat-wrapper .markdown-body :deep(pre code) { background: none; padding: 0; color: #e2e8f0; font-size: 13px; }
+.ai-chat-wrapper .markdown-body :deep(pre code) { background: none; padding: 0; font-size: 13px; }
 .ai-chat-wrapper .markdown-body :deep(strong) { color: var(--text); font-weight: 700; }
 .ai-chat-wrapper .markdown-body :deep(h2), .ai-chat-wrapper .markdown-body :deep(h3), .ai-chat-wrapper .markdown-body :deep(h4) {
   margin: 0.6rem 0 0.3rem; color: var(--text); font-weight: 700;
@@ -2797,7 +3923,7 @@ html[data-theme='dark'] .msg-bubble.assistant .msg-content {
   background: rgba(30, 41, 59, 0.75);
   border-color: rgba(148, 163, 184, 0.12);
 }
-html[data-theme='dark'] .ai-chat-wrapper .markdown-body :deep(code) {
+html[data-theme='dark'] .ai-chat-wrapper .markdown-body :deep(:not(pre) > code) {
   background: rgba(5, 150, 105, 0.12); color: #f472b6;
 }
 html[data-theme='dark'] .ai-chat-wrapper .markdown-body :deep(pre) {
@@ -2840,6 +3966,34 @@ html[data-theme='dark'] .sug-btn { border-color: rgba(148, 163, 184, 0.2); }
   color: var(--text);
   margin: 0;
 }
+/* 草稿自动保存提示 + 恢复条 */
+.draft-tip {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.draft-restore-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 13px;
+  color: var(--primary);
+  background: var(--primary-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.9rem;
+}
+.draft-discard {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+.draft-discard:hover { color: #dc2626; border-color: #dc2626; }
 .editor-actions-row {
   display: flex;
   gap: 0.6rem;
@@ -2941,6 +4095,17 @@ html[data-theme='dark'] .sug-btn { border-color: rgba(148, 163, 184, 0.2); }
 .toolbar-btn:hover {
   background: var(--primary-bg);
   color: var(--primary-dark);
+}
+.toolbar-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.toolbar-btn.toolbar-img {
+  width: auto;
+  min-width: 32px;
+  padding: 0 0.45rem;
+  font-size: 13px;
+  font-weight: 600;
 }
 .editor-textarea {
   width: 100%;
