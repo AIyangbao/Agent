@@ -4,7 +4,6 @@ import json
 import asyncio
 from rag.retrieve import retrieve
 from fastapi.responses import StreamingResponse
-from services.agent_service import AgentService
 from utils.auth import get_current_user
 from utils.response import success_response, error_response
 from curd.chat_history import save_message,get_history,clear_history
@@ -18,6 +17,7 @@ async def chat(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from services.agent_service import AgentService
     agent = AgentService()
     full_reply = []
     await save_message(db,current_user.id,"user",req.message) # 先存用户消息

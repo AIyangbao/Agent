@@ -7,7 +7,7 @@ RAG 模块 · 第 1 层：文本向量化 (Embedding)
   - 输出已 L2 归一化 (模长=1)
   - 免费额度 100 万 token（控制台"向量模型"tab 可见）
 """
-from dashscope import TextEmbedding
+
 
 # 与百炼控制台"向量模型"里显示的模型名完全一致
 EMBED_MODEL = "qwen3.7-text-embedding"
@@ -15,6 +15,7 @@ EMBED_MODEL = "qwen3.7-text-embedding"
 _BATCH_SIZE = 8
 
 def embed_texts(texts):
+    from dashscope import TextEmbedding
     """
     批量文本 -> 向量列表
     :param texts: ["文章1", "文章2", ...]

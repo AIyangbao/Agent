@@ -2,8 +2,7 @@
 RAG 模块 · 第 2 层：向量存储 (Chroma)
 把 embed_texts() 产出的向量持久化到本地，并支持相似检索。
 """
-import chromadb
-from .embeddings import embed_texts
+
 
 PERSIST_DIR = "./chroma_data" # 本地持久化目录
 COLLECTION = "blog_chunks" # 集合名
@@ -11,6 +10,8 @@ COLLECTION = "blog_chunks" # 集合名
 _client = None # 单例: 避免每次调用都重新把HNSW索引加载进内存
 
 def get_client():
+    import chromadb
+    from .embeddings import embed_texts
     global _client
     if _client is None:
         _client = chromadb.PersistentClient(path=PERSIST_DIR)
