@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 import os
 
@@ -7,6 +7,7 @@ load_dotenv()
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_parse_list=True)
     # 数据库
     DB_HOST: str = os.getenv("DB_HOST")
     DB_PORT: int = int(os.getenv("DB_PORT"))
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
     # AI
     DASHSCOPE_API_KEY: str = os.getenv("DASHSCOPE_API_KEY","")
     QWEN_MODEL: str = os.getenv("QWEN_MODEL","qwen-plus")
+    #CORS
+    CORS_ORIGINS: list[str] = ["*"]
+    # SMS
+    SMS_MOCK: bool = True
 
     # 拼接异步数据库连接URL
     @property

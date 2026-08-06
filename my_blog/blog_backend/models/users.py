@@ -16,6 +16,9 @@ class User(time_Base):
     password: Mapped[str] = mapped_column(
         String(255), nullable=False, comment="密码(加密存储)"
     )
+    phone: Mapped[str] = mapped_column(
+        String(20), unique=True, nullable=True, index=True, comment="手机号(验证码登录)"
+    )
     is_delete: Mapped[bool] = mapped_column(
         Boolean, server_default=text("0"), comment="软删除"
     )

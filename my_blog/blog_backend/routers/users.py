@@ -3,6 +3,7 @@ from config.db_conf import get_db
 from schemas.users import UserRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 from curd.users import get_user_by_name, create_user, login_user
+from services.ratelimit_service import is_locked, record_fail
 from starlette import status
 from utils.response import success_response
 from utils.jwt import create_access_token
@@ -31,12 +32,15 @@ async def register(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
 # 用户登录接口
 @router.post("/login")
 async def login(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
+    # 爆破防护: 该账号被锁直接拒
+    if await is_locked(f"pwd:{user_data.username}"):
+        raise HTTPException(status_code=429, detail="尝试次数过多, 请10分钟后再试")
     login_result = await login_user(db, user_data)
     if login_result is None:
+        await record_fail(f"pwd:{user_data.username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="用户或密码错误"
         )
-
     # 生成token,把用户ID写进payload的“sub"字段
     access_token = create_access_token(
         data={"sub": str(login_result.id)}, expires_delta=timedelta(days=3)

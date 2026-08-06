@@ -51,3 +51,20 @@ async def update_user(
     await db.flush()
     await db.refresh(user)
     return True
+
+# 根据手机号查询用户
+async def get_or_create_user_by_phone(db: AsyncSession, phone: str):
+    user = (await db.execute(select(User).where(User.phone == phone, User.is_delete == False))).scalar_one_or_none()
+    if user:
+        return user
+    import secrets
+    user = User(
+        username=f"u_{phone}",
+        password=get_hash_password(secrets.token_hex(8)), # 验证码登录无密码, 给随机占位
+        phone=phone,
+    )
+    db.add(user)
+    await db.flush()
+    await db.commit()
+    await db.refresh(user)
+    return user
