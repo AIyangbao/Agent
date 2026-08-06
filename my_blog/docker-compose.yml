@@ -50,16 +50,15 @@ services:
     image: crpi-9640jlmu7u6aesbj.cn-guangzhou.personal.cr.aliyuncs.com/ali_cat/agent:blog_backend_latest
     container_name: blog-backend
     restart: always
+    # 密钥/配置集中从 .env 注入（DB_PWD/DB_NAME/JWT_PWD/DASHSCOPE_API_KEY/QWEN_MODEL/CORS_ORIGINS/SMS_MOCK）
+    # 注意：.env 顶层仍用于 compose 变量插值（mysql 段 ${DB_PWD} 等）；此处是给 backend 容器自身注入运行环境变量
+    env_file:
+      - .env
     environment:
+      # ↓ 容器编排常量（描述服务间如何连接），不放进 .env，避免每个环境重复配
       DB_HOST: mysql          # 指向 MySQL 容器名，不是 127.0.0.1
       DB_PORT: 3306           # 容器内部端口，不是宿主机的 3307
       DB_USER: root
-      DB_PWD: ${DB_PWD}
-      DB_NAME: ${DB_NAME}
-      JWT_PWD: ${JWT_PWD}
-      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
-      QWEN_MODEL: ${QWEN_MODEL}
-      # CORS_ORIGINS / SMS_MOCK 不在此硬写，走 .env / settings.py 默认值，避免空值注入导致后端启动崩溃
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
