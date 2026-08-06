@@ -2,6 +2,7 @@ import redis.asyncio as redis
 import json
 from typing import Any
 from config.settings import settings
+from utils.log import logger
 import random
 # 创建 Redis 的连接对象
 redis_client = redis.Redis(
@@ -27,7 +28,7 @@ async def get_cache(key: str):
     try:
         return await redis_client.get(key)
     except Exception as e:
-        print(f"获取缓存失败:{e}")
+        logger.warning("获取缓存失败:%s",e)
         return None
 
 
@@ -41,7 +42,7 @@ async def get_json_cache(key: str):
             return json.loads(data)
         return None
     except Exception as e:
-        print(f"获取JSON缓存失败:{e}")
+        logger.warning("获取缓存失败:%s",e)
         return None
 
 
@@ -53,10 +54,10 @@ async def set_cache(key: str, value: Any, expire: int = 3600):
         if isinstance(value, (dict, list)):
             # 转字符串再存
             value = json.dumps(value, ensure_ascii=False)  # 中文正常保存
-        await redis_client.setex(key, expire, value)
+        await redis_client.set(key, value, ex=expire)
         return None
     except Exception as e:
-        print(f"设置缓存失败:{e}")
+        logger.warning("设置缓存失败:%s",e)
         return False
 
 # 删除缓存 delex(key)
@@ -66,7 +67,7 @@ async def delete_cache(key: str):
     try:
         return await redis_client.delete(key)
     except Exception as e:
-        print(f"删除缓存失败:{e}")
+        logger.warning("删除缓存失败:%s",e)
         return False
 
 # 删除所有prefix*的key,用于列表缓存批量失效
@@ -79,7 +80,7 @@ async def clear_prefix(prefix: str):
             await redis_client.delete(*keys)
         return len(keys)
     except Exception as e:
-        print(f"清前缀缓存失败:{e}")
+        logger.warning("清前缀缓存失败:%s",e)
         return 0
 
 def jitter_ttl(base: int = DEFAULT_CACHE_TTL, jitter: int = CACHE_TTL_JITTER) -> int:

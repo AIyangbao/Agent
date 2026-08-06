@@ -1,19 +1,20 @@
 from rag.ingest import ingest_one, remove_one
 from curd.blogs import add_blog,update_blog,get_blog_detail,delete_blog
+from utils.log import logger
 async def _safe_ingest(post_id: int,title: str, content: str):
     """RAG 是增强功能,异常必须吞掉,绝不让它影响核心发文。"""
     try:
         n = await ingest_one(post_id, title, content)
-        print(f"[RAG]文章{post_id}入库完成, chunk数={n}")
+        logger.info(f"[RAG]文章{post_id}入库完成, chunk数={n}")
     except Exception as e:
-         print(f"[RAG]文章{post_id}入库失败(不影响业务):{e}")
+        logger.warning(f"[RAG]文章{post_id}入库失败(不影响业务):{e}")
 
 def _safe_remove(post_id: int):
     try:
         n = remove_one(post_id)
-        print(f"[RAG]文章{post_id}已从向量库移除,chunk数={n}")
+        logger.info(f"[RAG]文章{post_id}已从向量库移除,chunk数={n}")
     except Exception as e:
-        print(f"[RAG]文章 {post_id} 移除失败(不影响业务):{e}")
+        logger.warning(f"[RAG]文章 {post_id} 移除失败(不影响业务):{e}")
 
 async def create_blog_with_rag(db,blog,user_id,background_tasks=None):
     """发文章: 写库 + 增量入向量库。RAG 失败不影响发文。"""
