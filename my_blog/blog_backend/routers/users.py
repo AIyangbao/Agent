@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from config.db_conf import get_db
-from schemas.users import UserRequest
+from schemas.users import UserRequest, UserChangePasswordRequest
 from sqlalchemy.ext.asyncio import AsyncSession
-from curd.users import get_user_by_name, create_user, login_user
+from curd.users import get_user_by_name, create_user, login_user, update_user_password, get_user_by_id
 from services.ratelimit_service import is_locked, record_fail
 from starlette import status
-from utils.response import success_response
+from models.users import User
+from utils.response import success_response,error_response
 from utils.jwt import create_access_token
+from utils.auth import get_current_user
 from datetime import timedelta
 
 router = APIRouter(prefix="/api/user", tags=["users"])
@@ -50,5 +52,10 @@ async def login(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
 
 # 用户修改接口
 @router.put("/password")
-async def update_password():
-    return
+async def update_password(data: UserChangePasswordRequest, 
+                          db: AsyncSession = Depends(get_db),
+                          current_user: User = Depends(get_current_user),
+                          ):
+    if not update_user_password(db,current_user.id,data):
+        return error_response(400, "原密码错误")
+    return success_response("密码修改成功")

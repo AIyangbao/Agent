@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from models.users import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.users import UserRequest
+from schemas.users import UserRequest,UserChangePasswordRequest
 from utils.security import get_hash_password, verify_password
 
 
@@ -40,18 +40,17 @@ async def login_user(db: AsyncSession, user_data: UserRequest):
 
 
 # 修改用户密码
-async def update_user(
-    db: AsyncSession, user: User, old_password: str, new_password: str
+async def update_user_password(
+    db: AsyncSession, user_id: int, data: UserChangePasswordRequest
 ):
-    if not verify_password(old_password, user.password):
+    user = await get_user_by_id(db, user_id)
+    if not user:
         return False
-    hashed_new_pwd = get_hash_password(new_password)
-    user.password = hashed_new_pwd
-    db.add(user)
+    if not verify_password(data.old_password, user.password):
+        return False
+    user.password = get_hash_password(data.new_password)
     await db.flush()
-    await db.refresh(user)
     return True
-
 # 根据手机号查询用户
 async def get_or_create_user_by_phone(db: AsyncSession, phone: str):
     user = (await db.execute(select(User).where(User.phone == phone, User.is_delete == False))).scalar_one_or_none()
