@@ -8,7 +8,12 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 // 标题转锚点 id：小写、空白转连字符、保留中文与字母数字，去除其它符号
@@ -24,9 +29,10 @@ function slugify(text) {
 
 function safeUrl(url) {
   const u = (url || '').trim()
-  // 仅允许 http/https/相对路径/data:image，阻断 javascript: 等危险协议
-  if (/^(https?:|\/|data:image\/)/i.test(u)) return u
-  if (/^[^a-z]+:/i.test(u)) return ''
+  // 仅放行 http/https、相对路径、data:image；任何其它协议
+  //（javascript:、data:text/html、vbscript: 等）一律拦截，杜绝 XSS
+  if (/^(https?:\/\/|\/|data:image\/)/i.test(u)) return u
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return ''
   return u
 }
 

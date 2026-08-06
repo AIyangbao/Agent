@@ -11,21 +11,52 @@
 
       <!-- 登录 -->
       <form v-if="isLogin" @submit.prevent="handleLogin">
-        <div class="form-group">
-          <label class="form-label">用户名</label>
-          <div class="input-wrap">
-            <span class="input-icon">👤</span>
-            <input class="form-control" v-model="loginForm.username" placeholder="请输入用户名" required />
-          </div>
+        <!-- 登录方式切换 -->
+        <div class="auth-mode">
+          <button type="button" class="auth-mode-btn" :class="{ active: loginMode === 'password' }" @click="loginMode = 'password'">密码登录</button>
+          <button type="button" class="auth-mode-btn" :class="{ active: loginMode === 'sms' }" @click="loginMode = 'sms'">验证码登录</button>
         </div>
-        <div class="form-group">
-          <label class="form-label">密码</label>
-          <div class="input-wrap">
-            <span class="input-icon">🔒</span>
-            <input class="form-control" v-model="loginForm.password" type="password" placeholder="请输入密码" required />
+
+        <!-- 密码登录 -->
+        <template v-if="loginMode === 'password'">
+          <div class="form-group">
+            <label class="form-label">用户名</label>
+            <div class="input-wrap">
+              <span class="input-icon">👤</span>
+              <input class="form-control" v-model="loginForm.username" placeholder="请输入用户名" required />
+            </div>
           </div>
-        </div>
-        <button class="btn-block" type="submit">登 录</button>
+          <div class="form-group">
+            <label class="form-label">密码</label>
+            <div class="input-wrap">
+              <span class="input-icon">🔒</span>
+              <input class="form-control" v-model="loginForm.password" type="password" placeholder="请输入密码" required />
+            </div>
+          </div>
+        </template>
+
+        <!-- 验证码登录 -->
+        <template v-else>
+          <div class="form-group">
+            <label class="form-label">手机号</label>
+            <div class="input-wrap">
+              <span class="input-icon">📱</span>
+              <input class="form-control" v-model="smsForm.phone" placeholder="请输入手机号" maxlength="11" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">验证码</label>
+            <div class="input-wrap code-wrap">
+              <span class="input-icon">🔑</span>
+              <input class="form-control" v-model="smsForm.code" placeholder="6位验证码" maxlength="6" inputmode="numeric" />
+              <button type="button" class="code-btn" :disabled="countdown > 0 || sending" @click="sendCode">
+                {{ sending ? '发送中…' : (countdown > 0 ? `${countdown}s 后重发` : '获取验证码') }}
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <button class="btn-block" type="submit" :disabled="loading">登 录</button>
       </form>
 
       <!-- 注册 -->
@@ -63,11 +94,11 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useUserStore } from '../store'
 import { useRouter } from 'vue-router'
 import { inject } from 'vue'
-import { login as apiLogin, register as apiRegister } from '../api/auth'
+import { login as apiLogin, register as apiRegister, smsSend, smsLogin } from '../api/auth'
 
 const user = useUserStore()
 const router = useRouter()
@@ -75,11 +106,44 @@ const toast = inject('toast')
 
 const isLogin = ref(true)
 const loading = ref(false)
+const loginMode = ref('password') // password | sms
 
 const loginForm = ref({ username: '', password: '' })
 const regForm = ref({ username: '', password: '', confirm: '' })
+const smsForm = ref({ phone: '', code: '' })
+
+// 发送验证码倒计时（60s）
+const sending = ref(false)
+const countdown = ref(0)
+let timer = null
+function startCountdown() {
+  countdown.value = 60
+  timer = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) { clearInterval(timer); timer = null }
+  }, 1000)
+}
+onUnmounted(() => { if (timer) clearInterval(timer) })
+
+const PHONE_RE = /^1[3-9]\d{9}$/
+
+async function sendCode() {
+  const phone = smsForm.value.phone.trim()
+  if (!PHONE_RE.test(phone)) { toast('请输入正确的手机号', 'error'); return }
+  sending.value = true
+  try {
+    await smsSend(phone)
+    startCountdown()
+    toast('验证码已发送（开发期请查看后端日志）', 'success')
+  } catch (e) {
+    toast(e.message || '发送失败', 'error')
+  } finally {
+    sending.value = false
+  }
+}
 
 async function handleLogin() {
+  if (loginMode.value === 'sms') return handleSmsLogin()
   const { username, password } = loginForm.value
   if (!username || !password) { toast('请填写完整信息', 'error'); return }
   loading.value = true
@@ -87,6 +151,25 @@ async function handleLogin() {
     const res = await apiLogin(username, password)
     user.login(username, res.access_token)
     toast(`欢迎回来，${username} ✨`, 'success')
+    setTimeout(() => router.push('/posts'), 800)
+  } catch (e) {
+    toast(e.message || '登录失败', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleSmsLogin() {
+  const phone = smsForm.value.phone.trim()
+  const code = smsForm.value.code.trim()
+  if (!PHONE_RE.test(phone)) { toast('请输入正确的手机号', 'error'); return }
+  if (!code) { toast('请输入验证码', 'error'); return }
+  loading.value = true
+  try {
+    const res = await smsLogin(phone, code)
+    // 短信登录没有用户名，用手机号作为展示名（与 user.login 签名一致）
+    user.login(phone, res.access_token)
+    toast(`欢迎回来，${phone} ✨`, 'success')
     setTimeout(() => router.push('/posts'), 800)
   } catch (e) {
     toast(e.message || '登录失败', 'error')
@@ -140,6 +223,26 @@ async function handleRegister() {
   background: transparent; border: none; font-weight: 500;
 }
 .auth-tab.active { background: var(--primary-bg); color: var(--primary); font-weight: 700; }
+.auth-mode {
+  display: flex; gap: 0.5rem; margin-bottom: 1.25rem;
+  background: var(--bg-body); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 0.3rem;
+}
+.auth-mode-btn {
+  flex: 1; padding: 0.5rem; border: none; border-radius: 8px;
+  background: transparent; color: var(--text-secondary); font-size: 13px;
+  cursor: pointer; transition: all var(--transition); font-weight: 500;
+}
+.auth-mode-btn.active { background: var(--primary); color: #fff; font-weight: 700; }
+.code-wrap .form-control { padding-right: 7.5rem; }
+.code-btn {
+  position: absolute; right: 0.4rem; top: 50%; transform: translateY(-50%);
+  border: none; background: var(--primary-bg); color: var(--primary);
+  font-size: 12.5px; font-weight: 600; padding: 0.4rem 0.6rem;
+  border-radius: 8px; cursor: pointer; transition: all var(--transition); white-space: nowrap;
+}
+.code-btn:hover:not(:disabled) { background: var(--primary); color: #fff; }
+.code-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .form-group { margin-bottom: 1rem; }
 .form-label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 500; }
 .input-wrap { position: relative; }

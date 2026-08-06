@@ -11,3 +11,11 @@ export function login(username, password) {
 export function register(username, password) {
   return post('/user/register', { username, password })
 }
+
+// 短信验证码登录（对接 routers/sms.py 的 /api/sms/send 与 /api/sms/login）
+export function smsSend(phone) {
+  return post('/sms/send', { phone })
+}
+export function smsLogin(phone, code) {
+  return post('/sms/login', { phone, code })
+}
