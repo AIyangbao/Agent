@@ -59,6 +59,7 @@ services:
       JWT_PWD: ${JWT_PWD}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
       QWEN_MODEL: ${QWEN_MODEL}
+      # CORS_ORIGINS / SMS_MOCK 不在此硬写，走 .env / settings.py 默认值，避免空值注入导致后端启动崩溃
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
