@@ -99,6 +99,14 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    # 前端健康检查：nginx 起来后能正常响应首页才算 healthy
+    # 用 busybox 自带的 wget 探活（不依赖 curl），--spider 只发请求不下载
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     networks:
       - blog-network
 
