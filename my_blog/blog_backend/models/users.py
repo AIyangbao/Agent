@@ -19,6 +19,15 @@ class User(time_Base):
     phone: Mapped[str] = mapped_column(
         String(20), unique=True, nullable=True, index=True, comment="手机号(验证码登录)"
     )
+    nickname: Mapped[str] = mapped_column(
+        String(50), nullable=True, comment="呢称"
+    )
+    avatar: Mapped[str] = mapped_column(
+        String(512), nullable=True, comment="头像URL"
+    )
+    bio: Mapped[str] = mapped_column(
+        String(500), nullable=True, comment="个人简介"
+    )
     is_delete: Mapped[bool] = mapped_column(
         Boolean, server_default=text("0"), comment="软删除"
     )
