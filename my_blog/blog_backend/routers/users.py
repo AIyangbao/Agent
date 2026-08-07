@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from config.db_conf import get_db
-from schemas.users import UserRequest, UserChangePasswordRequest
+from schemas.users import UserRequest, UserChangePasswordRequest, UserProfileUpdate
 from sqlalchemy.ext.asyncio import AsyncSession
-from curd.users import get_user_by_name, create_user, login_user, update_user_password, get_user_by_id
+from curd.users import get_user_by_name, create_user, login_user, update_user_password, get_user_by_id, update_user_profile
 from services.ratelimit_service import is_locked, record_fail
 from starlette import status
 from models.users import User
@@ -56,6 +56,30 @@ async def update_password(data: UserChangePasswordRequest,
                           db: AsyncSession = Depends(get_db),
                           current_user: User = Depends(get_current_user),
                           ):
-    if not update_user_password(db,current_user.id,data):
+    if not await update_user_password(db,current_user.id,data):
         return error_response(400, "原密码错误")
     return success_response("密码修改成功")
+
+# 获取当前用户资料接口
+@router.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return success_response("ok",data={
+        "id": current_user.id,
+        "username": current_user.username,
+        "nickname": current_user.nickname,
+        "avatar": current_user.avatar,
+        "bio": current_user.bio,
+        "phone": current_user.phone,
+    })
+
+# 更新资料 (昵称/头像/简介)
+@router.put("/profile")
+async def update_profile(
+    data: UserProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ok = await update_user_profile(db, current_user.id, data)
+    if not ok:
+        return error_response(400, "更新失败")
+    return success_response("资料更新成功")

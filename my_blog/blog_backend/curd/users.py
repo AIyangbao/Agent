@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from models.users import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.users import UserRequest,UserChangePasswordRequest
+from schemas.users import UserRequest,UserChangePasswordRequest, UserProfileUpdate
 from utils.security import get_hash_password, verify_password
 
 
@@ -67,3 +67,16 @@ async def get_or_create_user_by_phone(db: AsyncSession, phone: str):
     await db.commit()
     await db.refresh(user)
     return user
+
+async def update_user_profile(db: AsyncSession, user_id: int, data: UserProfileUpdate):
+    user = await get_user_by_id(db,user_id)
+    if not user:
+        return False
+    if data.nickname is not None:
+        user.nickname = data.nickname
+    if data.avatar is not None:
+        user.avatar = data.avatar
+    if data.bio is not None:
+        user.bio = data.bio
+    await db.flush()
+    return True
