@@ -16,7 +16,9 @@ set -euo pipefail
 # ===== 配置 =====
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/blog_mysql}"
+# 默认备份到仓库内的 backups/ 子目录（跨平台：Windows Git Bash / Linux 都明确）
+# 生产服务器想换路径可覆盖：BACKUP_DIR=/var/backups/blog_mysql ./backup_mysql.sh
+BACKUP_DIR="${BACKUP_DIR:-$SCRIPT_DIR/backups}"
 RETENTION_DAYS=7
 CONTAINER="blog-mysql"
 DB_NAME="${DB_NAME:-blog_db}"
