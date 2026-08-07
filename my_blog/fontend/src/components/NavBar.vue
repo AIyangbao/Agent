@@ -29,6 +29,7 @@
               class="avatar"
               :style="user.avatar ? { backgroundImage: 'url(' + user.avatar + ')' } : {}"
               title="个人中心"
+              @click="$router.push('/profile'); showMenu = false"
             >
               <span v-if="!user.avatar">{{ user.initial || 'U' }}</span>
             </div>
@@ -36,7 +37,7 @@
               <div v-if="showMenu" class="user-dropdown">
                 <div class="dropdown-user-info">{{ user.username }}</div>
                 <div class="dropdown-divider"></div>
-                <a href="https://github.com/AIyangbao" target="_blank" class="dropdown-item">GitHub</a>
+                <router-link to="/profile" class="dropdown-item" @click="showMenu = false">个人中心</router-link>
                 <div class="dropdown-item logout" @click="handleLogout">退出登录</div>
               </div>
             </transition>
@@ -90,6 +91,7 @@
         <router-link to="/" class="mobile-link" @click="mobileOpen = false">主页</router-link>
         <router-link v-if="user.isLoggedIn" to="/write" class="mobile-link" @click="mobileOpen = false">写文章</router-link>
         <router-link v-if="user.isLoggedIn" to="/ai" class="mobile-link" @click="mobileOpen = false">AI</router-link>
+        <router-link v-if="user.isLoggedIn" to="/profile" class="mobile-link" @click="mobileOpen = false">个人中心</router-link>
         <div v-if="!user.isLoggedIn" class="mobile-link" @click="$router.push('/auth'); mobileOpen=false">登录 / 注册</div>
         <div v-else class="mobile-link danger" @click="handleLogout(); mobileOpen=false">退出</div>
         <!-- 移动端主题切换 -->

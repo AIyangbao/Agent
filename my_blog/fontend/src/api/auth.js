@@ -2,7 +2,7 @@
  * 用户相关 API
  * 对接 FastAPI 后端：blog_backend/routers/users.py
  */
-import { post } from './request'
+import { get, post, put } from './request'
 
 export function login(username, password) {
   return post('/user/login', { username, password })
@@ -18,4 +18,19 @@ export function smsSend(phone) {
 }
 export function smsLogin(phone, code) {
   return post('/sms/login', { phone, code })
+}
+
+// 获取当前登录用户资料（GET /api/user/me）
+export function getMe() {
+  return get('/user/me')
+}
+
+// 更新个人资料：昵称 / 头像 / 简介（PUT /api/user/profile）
+export function updateProfile(data) {
+  return put('/user/profile', data)
+}
+
+// 修改密码（PUT /api/user/password，需先校验旧密码）
+export function updatePassword(old_password, new_password) {
+  return put('/user/password', { old_password, new_password })
 }
