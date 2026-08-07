@@ -77,6 +77,7 @@ docker-compose.override.yml
 !blog_backend/init_data.sql
 mysql_data/
 chroma_data/
+backups/            # 自动备份的 MySQL dump（含用户密码哈希等敏感数据），禁止提交
 
 # ============================================
 # IDE / 编辑器
@@ -110,3 +111,4 @@ logs/
 .workbuddy/
 docs/
 uploads/
+backups/
