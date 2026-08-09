@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["*"]
     # SMS
     SMS_MOCK: bool = True
+    # 手机号加密密钥
+    PHONE_ENCRYPTION_KEY: str = os.getenv("PHONE_ENCRYPTION_KEY")
 
     # 拼接异步数据库连接URL
     @property
