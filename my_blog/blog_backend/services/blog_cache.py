@@ -61,7 +61,7 @@ async def invalidate_blog_detail(blog_id: int) -> None:
     await delete_cache(build_detail_key(blog_id))
 
 LOCK_PREFIX = "blog:lock:detail:"
-LOCK_TTL = 5 # 锁超时(秒), 必须 > 差DB 耗时, 否则会误放多个请求
+LOCK_TTL = 3 # 锁超时(秒), 必须 > 差DB 耗时, 否则会误放多个请求
 
 async def _acquire_detail_lock(blog_id: int) -> bool:
     """SET key token NX EX -- 原子加锁, 拿到返回True"""
@@ -94,20 +94,18 @@ async def get_blog_detail_with_mutex(blog_id: int, db):
             if not await redis_client.exists(f"{LOCK_PREFIX}{blog_id}"):
               #  锁没了：持锁者已主动释放（重建完成）或超时过期
                 cached = await get_cached_blog_detail(blog_id)
-            if cached is not None:
-                return cached # 真值或NONE都认
-            # 缓存仍空：持锁者 DB 超时没写好（锁已过期），
-            # 由本等待者顶上抢锁重建（依然只有 1 个查 DB），不自己
-            # 直接查DB
-            if await _acquire_detail_lock(blog_id):
-                got_lock = True
-                break
+                if cached is not None:
+                   return cached # 真值或NONE都认
+                # 缓存仍空：持锁者 DB 超时没写好（锁已过期），
+                # 由本等待者顶上抢锁重建（依然只有 1 个查 DB），不自己
+                # 直接查DB
+                if await _acquire_detail_lock(blog_id):
+                   got_lock = True
+                   break
             # 没抢到（被别的等待者抢了）→ 继续等下一轮
         if not got_lock:
             # 真极端：等满整个锁周期仍没建好，降级返回 NONE，绝不查 DB
             return "NONE"
-
-    
 
     # 拿到锁 -> 双重检查(避免抢锁瞬间别人已重建)
     try:
