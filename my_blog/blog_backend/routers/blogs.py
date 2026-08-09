@@ -23,6 +23,7 @@ from services.blog_cache import (
     set_blog_detail_none,
     invalidate_blog_list,
     invalidate_blog_detail,
+    get_blog_detail_with_mutex,
 )
 from services.rss_service import generate_blog_feed
 from services.image_service import save_image
@@ -61,19 +62,10 @@ async def list_blogs(
 # 获取指定博客详情接口
 @router.get("/detail")
 async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db)):
-    cached = await get_cached_blog_detail(id)
-    if cached == "NONE":
+    result = await get_blog_detail_with_mutex(id,db)
+    if result == "NONE":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="没有此文章信息")
-    if cached is not None:
-        return success_response(message="获取博客详情成功(缓存)",data=cached)
-    blog = await get_blog_detail(db, id)
-    if blog is None:
-        await set_blog_detail_none(id)
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="没有此文章信息"
-        )
-    await set_cached_blog_detail(id,blog)
-    return success_response(message="获取博客详情成功", data=blog)
+    return success_response(message="获取博客详情成功", data=result)
 
 
 # 添加博客接口
