@@ -28,6 +28,7 @@ from services.blog_cache import (
 from services.redis_lock import RedisLockCtx
 from services.rss_service import generate_blog_feed
 from services.image_service import save_image
+from services.uv_service import record_uv, count_uv
 from utils.response import success_response, error_response
 from utils.auth import get_current_user
 from starlette import status
@@ -62,10 +63,13 @@ async def list_blogs(
 
 # 获取指定博客详情接口
 @router.get("/detail")
-async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db)):
+async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db), request: Request = None):
     result = await get_blog_detail_with_mutex(id,db)
     if result == "NONE":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="没有此文章信息")
+     #  记录独立访客（HyperLogLog 自动去重）
+    client_ip = request.client.host if request and request.client else "unknown"
+    await record_uv(f"uv:blog:{id}", client_ip)
     return success_response(message="获取博客详情成功", data=result)
 
 
@@ -183,4 +187,6 @@ async def upload_image(
         return error_response(500, f"上传失败:{e}")
     return success_response(message="上传成功", data={"url": url})
 
-
+@router.get("/uv")
+async def blog_uv(id: int = Query(...), db: AsyncSession =Depends(get_db)):
+    return success_response(data={"blog_uv": await count_uv(f"uv:blog:{id}")})
