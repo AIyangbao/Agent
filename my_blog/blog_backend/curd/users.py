@@ -3,7 +3,7 @@ from models.users import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.users import UserRequest,UserChangePasswordRequest, UserProfileUpdate
 from utils.security import get_hash_password, verify_password
-
+from utils.crypto_utils import encrypt_phone, hash_phone
 
 # 根据用户id查询用户
 async def get_user_by_id(db: AsyncSession, id: int):
@@ -53,14 +53,16 @@ async def update_user_password(
     return True
 # 根据手机号查询用户
 async def get_or_create_user_by_phone(db: AsyncSession, phone: str):
-    user = (await db.execute(select(User).where(User.phone == phone, User.is_delete == False))).scalar_one_or_none()
+    h = hash_phone(phone)
+    user = (await db.execute(select(User).where(User.phone_hash == h, User.is_delete == False))).scalar_one_or_none()
     if user:
         return user
     import secrets
     user = User(
         username=f"u_{phone}",
         password=get_hash_password(secrets.token_hex(8)), # 验证码登录无密码, 给随机占位
-        phone=phone,
+        phone_encrypted=encrypt_phone(phone),
+        phone_hash=h,
     )
     db.add(user)
     await db.flush()
@@ -68,6 +70,7 @@ async def get_or_create_user_by_phone(db: AsyncSession, phone: str):
     await db.refresh(user)
     return user
 
+# 修改用户个人信息
 async def update_user_profile(db: AsyncSession, user_id: int, data: UserProfileUpdate):
     user = await get_user_by_id(db,user_id)
     if not user:
@@ -80,3 +83,26 @@ async def update_user_profile(db: AsyncSession, user_id: int, data: UserProfileU
         user.bio = data.bio
     await db.flush()
     return True
+
+# 根据手机号哈希查询用户（用于注册前查重）
+async def get_user_by_phone_hash(db: AsyncSession, phone: str):
+    h = hash_phone(phone)
+    result = await db.execute(
+        select(User).where(User.phone_hash == h, User.is_delete == False)
+    )
+    return result.scalar_one_or_none()
+
+# 用手机号严格创建用户；调用前必须确认该手机号未注册
+async def create_user_by_phone(db: AsyncSession, phone: str):
+    import secrets
+    h = hash_phone(phone)
+    user = User(
+        username=f"u_{phone}",
+        password=get_hash_password(secrets.token_hex(8)), # 验证码注册无密码，给随机占位
+        phone_encrypted=encrypt_phone(phone),
+        phone_hash=h,
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user

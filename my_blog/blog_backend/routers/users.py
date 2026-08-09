@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from config.db_conf import get_db
-from schemas.users import UserRequest, UserChangePasswordRequest, UserProfileUpdate
+from schemas.users import UserRequest, UserChangePasswordRequest, UserProfileUpdate, UserRegisterByPhoneRequest
 from sqlalchemy.ext.asyncio import AsyncSession
-from curd.users import get_user_by_name, create_user, login_user, update_user_password, get_user_by_id, update_user_profile
+from curd.users import get_user_by_name, create_user, login_user, update_user_password, get_user_by_id, update_user_profile, get_user_by_phone_hash, create_user_by_phone
 from services.ratelimit_service import is_locked, record_fail
+from services.sms_service import verify_and_phone
 from starlette import status
 from models.users import User
 from utils.response import success_response,error_response
@@ -69,7 +70,6 @@ async def get_me(current_user: User = Depends(get_current_user)):
         "nickname": current_user.nickname,
         "avatar": current_user.avatar,
         "bio": current_user.bio,
-        "phone": current_user.phone,
     })
 
 # 更新资料 (昵称/头像/简介)
@@ -83,3 +83,31 @@ async def update_profile(
     if not ok:
         return error_response(400, "更新失败")
     return success_response("资料更新成功")
+
+@router.post("/register/phone")
+async def register_by_phone(
+    data: UserRegisterByPhoneRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    # 校验短信验证码
+    if not await verify_and_phone(data.phone, data.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="验证码错误或已过期"
+        )
+
+    # 检查手机号是否已注册
+    existing = await get_user_by_phone_hash(db, data.phone)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="手机号已注册"
+        )
+
+    # 创建用户并签发 token
+    user = await create_user_by_phone(db, data.phone)
+    access_token = create_access_token(
+        data={"sub": str(user.id)}, expires_delta=timedelta(days=3)
+        )
+    return success_response(
+        "注册成功",
+        data={"access_token": access_token, "username": user.username}
+    )

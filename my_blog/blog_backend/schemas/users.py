@@ -22,5 +22,8 @@ class UserMe(BaseModel):
     nickname: str | None = None
     avatar: str | None = None
     bio: str | None = None
-    phone: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
+class UserRegisterByPhoneRequest(BaseModel):
+    phone : str = Field(min_length=11, max_length=11, pattern=r"^1[3-9]\d{9}$")
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
