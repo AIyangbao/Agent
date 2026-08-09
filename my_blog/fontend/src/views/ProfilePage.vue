@@ -41,11 +41,18 @@
       <!-- 昵称 -->
       <div class="pf-field">
         <label class="pf-label">昵称</label>
+        <!-- 诱捕 Chrome 自动填充，避免把旧账号填到真正的昵称框 -->
+        <input type="text" style="position:absolute;opacity:0;pointer-events:none;height:0;" autocomplete="username" name="decoy-username" tabindex="-1" />
         <input
+          ref="nicknameInput"
           class="pf-input"
           v-model="profile.nickname"
           maxlength="20"
           placeholder="展示在评论与导航栏的名字"
+          autocomplete="off"
+          name="profile-nickname"
+          :disabled="loadingProfile"
+          :readonly="loadingProfile"
         />
       </div>
 
@@ -58,12 +65,15 @@
           maxlength="200"
           rows="4"
           placeholder="一句话介绍你自己（最多 200 字）"
+          autocomplete="off"
+          name="profile-bio"
+          :disabled="loadingProfile"
         ></textarea>
         <div class="pf-count">{{ (profile.bio || '').length }}/200</div>
       </div>
 
-      <button class="pf-btn-primary" type="button" :disabled="savingProfile" @click="saveProfile">
-        {{ savingProfile ? '保存中…' : '保存资料' }}
+      <button class="pf-btn-primary" type="button" :disabled="savingProfile || loadingProfile" @click="saveProfile">
+        {{ loadingProfile ? '加载中…' : (savingProfile ? '保存中…' : '保存资料') }}
       </button>
     </section>
 
@@ -72,15 +82,15 @@
       <h2 class="pf-card-title">修改密码</h2>
       <div class="pf-field">
         <label class="pf-label">当前密码</label>
-        <input class="pf-input" type="password" v-model="pwd.old_password" placeholder="请输入当前密码" />
+        <input class="pf-input" type="password" v-model="pwd.old_password" placeholder="请输入当前密码" autocomplete="current-password" name="current-password" />
       </div>
       <div class="pf-field">
         <label class="pf-label">新密码</label>
-        <input class="pf-input" type="password" v-model="pwd.new_password" placeholder="至少 6 位" />
+        <input class="pf-input" type="password" v-model="pwd.new_password" placeholder="至少 6 位" autocomplete="new-password" name="new-password" />
       </div>
       <div class="pf-field">
         <label class="pf-label">确认新密码</label>
-        <input class="pf-input" type="password" v-model="pwd.confirm" placeholder="再次输入新密码" />
+        <input class="pf-input" type="password" v-model="pwd.confirm" placeholder="再次输入新密码" autocomplete="new-password" name="confirm-new-password" />
       </div>
       <button class="pf-btn-primary" type="button" :disabled="savingPwd" @click="savePassword">
         {{ savingPwd ? '保存中…' : '更新密码' }}
@@ -109,6 +119,8 @@ const savingPwd = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const avatarInput = ref(null)
+const nicknameInput = ref(null)
+const loadingProfile = ref(true)
 
 onMounted(async () => {
   // 未登录保护：路由 meta.requiresAuth 但项目暂无全局守卫，这里兜底
@@ -125,6 +137,8 @@ onMounted(async () => {
     }
   } catch (e) {
     toast && toast(e.message || '加载资料失败', 'error')
+  } finally {
+    loadingProfile.value = false
   }
 })
 
@@ -269,6 +283,13 @@ async function savePassword() {
   border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
 }
 .pf-input::placeholder, .pf-textarea::placeholder { color: var(--text-dim); }
+/* 覆盖 Chrome 自动填充的黄色/蓝色背景，让用户看到的是正常底色 */
+.pf-input:-webkit-autofill,
+.pf-textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-body) inset !important;
+  -webkit-text-fill-color: var(--text) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
 .pf-count { text-align: right; font-size: 12px; color: var(--text-dim); margin-top: 0.3rem; }
 
 .pf-btn-primary {

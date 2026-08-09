@@ -12,6 +12,11 @@ export function register(username, password) {
   return post('/user/register', { username, password })
 }
 
+// 手机号 + 验证码注册（对接 routers/users.py 的 /api/user/register/phone）
+export function registerByPhone(phone, code) {
+  return post('/user/register/phone', { phone, code })
+}
+
 // 短信验证码登录（对接 routers/sms.py 的 /api/sms/send 与 /api/sms/login）
 export function smsSend(phone) {
   return post('/sms/send', { phone })

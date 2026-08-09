@@ -61,27 +61,58 @@
 
       <!-- 注册 -->
       <form v-else @submit.prevent="handleRegister">
-        <div class="form-group">
-          <label class="form-label">用户名</label>
-          <div class="input-wrap">
-            <span class="input-icon">👤</span>
-            <input class="form-control" v-model="regForm.username" placeholder="4-20个字符" required />
-          </div>
+        <!-- 注册方式切换 -->
+        <div class="auth-mode">
+          <button type="button" class="auth-mode-btn" :class="{ active: regMode === 'username' }" @click="regMode = 'username'">用户名注册</button>
+          <button type="button" class="auth-mode-btn" :class="{ active: regMode === 'phone' }" @click="regMode = 'phone'">验证码注册</button>
         </div>
-        <div class="form-group">
-          <label class="form-label">密码</label>
-          <div class="input-wrap">
-            <span class="input-icon">🔒</span>
-            <input class="form-control" v-model="regForm.password" type="password" placeholder="至少6位" required />
+
+        <!-- 用户名注册 -->
+        <template v-if="regMode === 'username'">
+          <div class="form-group">
+            <label class="form-label">用户名</label>
+            <div class="input-wrap">
+              <span class="input-icon">👤</span>
+              <input class="form-control" v-model="regForm.username" placeholder="4-20个字符" required />
+            </div>
           </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">确认密码</label>
-          <div class="input-wrap">
-            <span class="input-icon">🔒</span>
-            <input class="form-control" v-model="regForm.confirm" type="password" placeholder="再次输入密码" required />
+          <div class="form-group">
+            <label class="form-label">密码</label>
+            <div class="input-wrap">
+              <span class="input-icon">🔒</span>
+              <input class="form-control" v-model="regForm.password" type="password" placeholder="至少6位" required />
+            </div>
           </div>
-        </div>
+          <div class="form-group">
+            <label class="form-label">确认密码</label>
+            <div class="input-wrap">
+              <span class="input-icon">🔒</span>
+              <input class="form-control" v-model="regForm.confirm" type="password" placeholder="再次输入密码" required />
+            </div>
+          </div>
+        </template>
+
+        <!-- 手机号注册 -->
+        <template v-else>
+          <div class="form-group">
+            <label class="form-label">手机号</label>
+            <div class="input-wrap">
+              <span class="input-icon">📱</span>
+              <input class="form-control" v-model="smsForm.phone" placeholder="请输入手机号" maxlength="11" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">验证码</label>
+            <div class="input-wrap code-wrap">
+              <span class="input-icon">🔑</span>
+              <input class="form-control" v-model="smsForm.code" placeholder="6位验证码" maxlength="6" inputmode="numeric" />
+              <button type="button" class="code-btn" :disabled="countdown > 0 || sending" @click="sendCode">
+                {{ sending ? '发送中…' : (countdown > 0 ? `${countdown}s 后重发` : '获取验证码') }}
+              </button>
+            </div>
+          </div>
+        </template>
+
         <button class="btn-block" type="submit">注 册</button>
       </form>
 
@@ -98,7 +129,7 @@ import { ref, onUnmounted } from 'vue'
 import { useUserStore } from '../store'
 import { useRouter } from 'vue-router'
 import { inject } from 'vue'
-import { login as apiLogin, register as apiRegister, smsSend, smsLogin } from '../api/auth'
+import { login as apiLogin, register as apiRegister, registerByPhone, smsSend, smsLogin } from '../api/auth'
 
 const user = useUserStore()
 const router = useRouter()
@@ -107,6 +138,7 @@ const toast = inject('toast')
 const isLogin = ref(true)
 const loading = ref(false)
 const loginMode = ref('password') // password | sms
+const regMode = ref('username') // username | phone
 
 const loginForm = ref({ username: '', password: '' })
 const regForm = ref({ username: '', password: '', confirm: '' })
@@ -179,6 +211,7 @@ async function handleSmsLogin() {
 }
 
 async function handleRegister() {
+  if (regMode.value === 'phone') return handlePhoneRegister()
   const { username, password, confirm } = regForm.value
   if (username.length < 4) { toast('用户名至少4个字符', 'error'); return }
   if (password.length < 6) { toast('密码至少6位', 'error'); return }
@@ -186,6 +219,25 @@ async function handleRegister() {
   loading.value = true
   try {
     const res = await apiRegister(username, password)
+    user.login(username, res.access_token)
+    toast(`注册成功，欢迎 ${username} 🎉`, 'success')
+    setTimeout(() => router.push('/posts'), 800)
+  } catch (e) {
+    toast(e.message || '注册失败', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handlePhoneRegister() {
+  const phone = smsForm.value.phone.trim()
+  const code = smsForm.value.code.trim()
+  if (!PHONE_RE.test(phone)) { toast('请输入正确的手机号', 'error'); return }
+  if (!code || code.length !== 6) { toast('请输入6位验证码', 'error'); return }
+  loading.value = true
+  try {
+    const res = await registerByPhone(phone, code)
+    const username = res.username || `u_${phone}`
     user.login(username, res.access_token)
     toast(`注册成功，欢迎 ${username} 🎉`, 'success')
     setTimeout(() => router.push('/posts'), 800)
