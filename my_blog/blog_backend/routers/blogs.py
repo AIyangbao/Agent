@@ -25,6 +25,7 @@ from services.blog_cache import (
     invalidate_blog_detail,
     get_blog_detail_with_mutex,
 )
+from services.redis_lock import RedisLockCtx
 from services.rss_service import generate_blog_feed
 from services.image_service import save_image
 from utils.response import success_response, error_response
@@ -76,7 +77,15 @@ async def add(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await create_blog_with_rag(db, blog, current_user.id, background_tasks)
+    # 按用户加锁：防同一用户并发重复提交（前端连点 / 网络重试）
+    async with RedisLockCtx(f"add_blog:{current_user.id}", expire=10) as lock:
+        if lock is None: # 没拿到锁 = 别人正在发，直接拒
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="操作过于频繁, 请稍后再试",
+            )
+        result = await create_blog_with_rag(db, blog, current_user.id, background_tasks)
+    # with 块结束 → 自动释放锁（取消看门狗 + Lua 删锁）
     await invalidate_blog_list()
     return success_response(message="添加博客成功", data=result)
 
