@@ -77,6 +77,8 @@ cp .env.example .env
 | `CORS_ORIGINS` ★ | `["https://blog.fireflyai.site","http://localhost:80"]` | **必须是 JSON 数组字符串**（见 §10 坑位 C） |
 | `SMS_MOCK` ★ | `true` 或 `false` | 短信验证码是否走 mock（true=不真发短信，直接返回验证码） |
 
+> **⚠️ 生产短信需企业账号**：阿里云 / 腾讯云短信服务均要求**企业实名认证**才能申请签名与模板，个人实名账号无入口。因此本项目默认 `SMS_MOCK=true`（开发/演示走 mock）。真实发送需：① 企业账号；② 在 `docs/sms_real.md` 落地服务商 SDK（异步 `to_thread` 调用）；③ 配置 `SMS_ACCESS_KEY_ID/SECRET/SIGN_NAME/TEMPLATE_CODE` 并将 `SMS_MOCK` 置 `false`。前端无需改动。
+
 `.env` 会被两路加载：
 - **本地开发**：代码里 `load_dotenv()` 读取。
 - **容器部署**：compose 的 `env_file: [.env]` 注入 backend 容器（配合 pydantic-settings）。
