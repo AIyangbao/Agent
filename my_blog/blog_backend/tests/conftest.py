@@ -160,7 +160,9 @@ async def redis_isolated():
     cache_conf.redis_client = client   # 覆盖模块级单例，路由/服务层统一走新客户端
     import services.redis_lock as redis_lock
     import services.blog_cache as blog_cache
+    import services.uv_service as uv_service
     redis_lock.redis_client = client # 让锁也走测试 client (db=1)
+    uv_service.redis_client = client # 让 UV 也走测试 client (db=1)
     await client.flushdb()
     yield
     await client.aclose()
