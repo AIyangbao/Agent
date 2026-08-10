@@ -5,7 +5,9 @@
         <h2>✍️ 写新文章</h2>
         <div class="editor-actions">
           <button class="btn-outline" @click="$router.push('/posts')">取消</button>
-          <button class="btn-primary" @click="publish">发布</button>
+          <button class="btn-primary" :disabled="isPublishing" @click="publish">
+            {{ isPublishing ? '发布中...' : '发布' }}
+          </button>
         </div>
       </div>
 
@@ -65,6 +67,7 @@ const content = ref('')
 const tag = ref('')
 const extraTags = ref('')
 const editorRef = ref(null)
+const isPublishing = ref(false)
 
 function insert(before, after) {
   const ta = editorRef.value
@@ -96,18 +99,17 @@ async function publish() {
     if (tt) tags.push(tt)
   })
 
+  isPublishing.value = true
   try {
     // 将标签名转换为标签ID
     const tagIds = tags.map(t => TAG_MAP[t]).filter(id => id != null)
-    const res = await createPost({ title: t, content: c, user_id: 1, tag_ids: tagIds })
-    title.value = ''
-    content.value = ''
-    tag.value = ''
-    extraTags.value = ''
+    await createPost({ title: t, content: c, tag_ids: tagIds })
     toast('文章发布成功 🎉', 'success')
-    setTimeout(() => router.push('/posts'), 600)
+    router.push('/posts')
   } catch (e) {
     toast(e.message || '发布失败', 'error')
+  } finally {
+    isPublishing.value = false
   }
 }
 </script>
@@ -169,6 +171,7 @@ async function publish() {
   transition: all var(--transition); box-shadow: 0 2px 10px rgba(5,150,105,0.25);
 }
 .btn-primary:hover { transform: translateY(-1px); background: var(--primary-dark); box-shadow: 0 4px 14px rgba(5,150,105,0.35); }
+.btn-primary:disabled { opacity: 0.65; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn-outline {
   padding: 0.5rem 1.1rem; border-radius: 24px;
   border: 1px solid var(--border-strong); background: transparent;

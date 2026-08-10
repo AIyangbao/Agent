@@ -107,7 +107,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted, reactive } from 'vue'
-import { chatWithAIStream } from '../api/ai'
+import { chatWithAIStream, fetchAIHistory, clearAIHistory } from '../api/ai'
 import { useUserStore } from '../store'
 import { renderMarkdown } from '../utils/markdown.js'
 
@@ -124,9 +124,9 @@ const inputRef = ref(null)
 
 // 快捷问题
 const quickQuestions = [
-  '介绍一下你的博客项目',
-  'FastAPI 和 Flask 有什么区别？',
-  '解释一下 Docker 的核心概念',
+  '我最近发了哪些博客？',
+  '搜一下 Docker 相关的文章',
+  '博客都有哪些标签？',
 ]
 
 // ---------- 发送消息（流式） ----------
@@ -238,11 +238,19 @@ async function scrollBottom() {
 // ---------- 清空对话 ----------
 function clearChat() {
   messages.value = []
+  clearAIHistory() // 同步清掉后端持久化的历史(失败静默,本地已清)
 }
 
-// ---------- 挂载后聚焦输入框 ----------
-onMounted(() => {
+// ---------- 挂载后聚焦输入框 + 恢复历史对话 ----------
+onMounted(async () => {
   inputRef.value?.focus()
+
+  // 恢复后端持久化的历史(刷新不丢)。未登录/后端没起时 fetchAIHistory 返回 [], 不影响空状态
+  const history = await fetchAIHistory()
+  messages.value = history
+    .filter(m => m && m.content && m.content.trim()) // 过滤掉流中断时存下的空消息
+    .map(m => ({ role: m.role === 'ai' ? 'assistant' : m.role, content: m.content }))
+  if (messages.value.length) await scrollBottom()
 })
 </script>
 
