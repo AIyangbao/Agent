@@ -9,22 +9,40 @@ from models.blogs import Blog
 from .embeddings import embed_texts
 from .store import add_chunks
 import asyncio
+import re
 CHUNK_SIZE = 500 # ，每块字符数(中文按字计)
 CHUNK_OVERLAP = 50 # 块间重叠,避免切断语义边界
 MIN_CONTENT_LEN = 50 # 正文最短长度,低于此视为噪声/测试文,不入库
 def split_text(text, size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    """按长度切块,带重叠。返回chunk列表。"""
+    """结构感知切块: 优先按段落(空行)边界切, 超长段落再按长度兜底。
+    避免把句子/代码块拦腰砍断, 让每块语义完整。"""
     text = (text or "").strip()
+    if not text:
+        return []
     if len(text) <= size:
-        return [text] if text else []
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + size
-        chunks.append(text[start:end])
-        if end >= len(text):
-            break
-        start += size - overlap
+        return [text]
+
+    paragraphs = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+    chunks, cur = [], ""
+    for p in paragraphs:
+        if len(p) > size: # 单段就超长 -> 按长度硬切(兜底, 保持重叠)
+            if cur:
+                chunks.append(cur); cur = ""  
+            start = 0
+            while start < len(p):
+              end = start + size
+              chunks.append(p[start:end])
+              if end >= len(p):
+                 break
+              start += size - overlap
+            continue
+        if cur and len(cur) + len(p) + 2 > size: # 累加会超 size -> 封块, 开新块
+            chunks.append(cur)
+            cur = p
+        else:
+            cur = (cur + "\n\n" + p) if cur else p
+    if cur:
+        chunks.append(cur)        
     return chunks
 
 async def ingest_all():
