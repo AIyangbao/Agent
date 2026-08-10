@@ -6,7 +6,7 @@ from typing import Any
 class BaseLLM(ABC):
 
     @abstractmethod
-    def invoke(self,messages: list[Any], tools: list[dict] | None = None) -> Any:
+    async def ainvoke(self,messages: list[Any], tools: list[dict] | None = None) -> Any:
         """
         调用LLM
         messages: LangChain消息列表

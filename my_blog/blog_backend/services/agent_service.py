@@ -5,12 +5,15 @@ from langchain_core.messages import SystemMessage, HumanMessage,AIMessage,ToolMe
 from tools.registry import ToolRegistry
 from llm.factory import get_llm
 
-SYSTEM_PROMPT = """你是[技术宅小窝]博客的AI助手.你可以使用工具来帮助用户.
+SYSTEM_PROMPT =  """你是[技术宅小窝]博客的AI助手。
+
+你可以使用这些工具:
+- get_weather: 查询某城市实时天气(参数 city 为中文城市名)
 
 规则:
-1. 技术问题直接回答,需要代码时给出代码示例
-2. 需要实时数据(如天气)时,调用对应工具
-3. 回答简洁、准确
+1. 用户问博客内容/某篇文章时, 优先基于下方注入的博客片段回答, 并在结尾注明来源
+2. 只有需要实时数据(如天气)时才调工具, 其它直接回答
+3. 回答简洁、准确, 需要代码时给示例
 """
 
 class AgentService:
@@ -37,42 +40,14 @@ class AgentService:
                 }
             })
         return schemas
-    # ----------- 主入口 -------------
-    async def chat(self,message: str, history: list[dict] | None = None) -> str:
-        """
-        处理一次对话.
-        histroy: [{"role": "user"/"ai","content":"..."}]
-        """
-        messages = self._build_messages(message,history or [])
-        tool_schemas = self._build_tool_schemas()
 
-        for _ in range(self.MAX_ITERATIONS):
-            # Think: 让LLM觉得是回答还是调用工具
-            response = self._llm.invoke(messages,tools=tool_schemas or None)
-
-            if not hasattr(response,"tool_calls") or not response.tool_calls:
-                return response.content
-            
-            messages.append(response)
-            for tc in response.tool_calls:
-                tool_name = tc["name"]
-                tool_args = tc["args"]
-                tool = self._tool_map.get(tool_name)
-
-                if tool:
-                    result = await tool.execute(**tool_args)
-                else:
-                    result = f"未知工具: {tool_name}"
-                
-                messages.append(ToolMessage(content=result,tool_call_id=tc["id"]))
-        return "抱歉,处理超时,请简化问题后重试"
     async def chat_stream(self, message: str, history: list[dict] | None = None,rag_context: str | None = None):
         messages = self._build_messages(message, history or [],rag_context)
         tool_schemas = self._build_tool_schemas()
 
         for _ in range(self.MAX_ITERATIONS):
             # Think: 决定回答还是调工具
-            response = self._llm.invoke(messages, tools=tool_schemas or None)
+            response = await self._llm.ainvoke(messages, tools=tool_schemas or None)
 
             if response.tool_calls:
                 # 工具分支: 先把结果拿回来,不流式
@@ -103,7 +78,7 @@ class AgentService:
         messages = [SystemMessage(content=system_content)]
 
         # 添加历史对话
-        for msg in history:
+        for msg in history[-10:]:
             role = msg.get("role","")
             content = msg.get("content","")
             if role == "user":

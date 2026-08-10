@@ -17,11 +17,11 @@ class QwenLLM(BaseLLM):
             streaming=True,
         )
     
-    def invoke(self,messages: list[BaseMessage],tools:list[dict] | None = None):
+    async def ainvoke(self,messages: list[BaseMessage],tools:list[dict] | None = None):
         llm= self._llm
         if tools:
             llm = llm.bind_tools(tools)
-        return llm.invoke(messages)
+        return await llm.ainvoke(messages)
     async def stream(self, messages: list[BaseMessage], tools: list[dict] | None = None):
         llm = self._llm
         if tools:
