@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from utils.auth import get_current_user
 from utils.response import success_response, error_response
 from curd.chat_history import save_message,get_history,clear_history
+from services.ratelimit_service import ai_rate_limited
 from config.db_conf import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter(prefix="/api/ai",tags=["ai"])
@@ -17,6 +18,8 @@ async def chat(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if await ai_rate_limited(current_user.id):
+       return error_response(code=429,message="提问太频繁啦,休息一下再试", data= None)
     from services.agent_service import AgentService
     agent = AgentService()
     full_reply = []
