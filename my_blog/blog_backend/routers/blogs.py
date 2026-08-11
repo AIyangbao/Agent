@@ -64,11 +64,19 @@ async def list_blogs(
 # 获取指定博客详情接口
 @router.get("/detail")
 async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db), request: Request = None):
+    client_ip = request.client.host if request and request.client else "unknown"
+    # 先查缓存: 命中直接返回(带"缓存"标记), 与列表路由保持一致
+    cached = await get_cached_blog_detail(id)
+    if cached == "NONE":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="没有此文章信息")
+    if cached is not None:
+        await record_uv(f"uv:blog:{id}", client_ip) # 注意: 命中缓存也要记 UV, 别丢
+        return success_response(message="获取博客详情成功(缓存)",data=cached)
+    # 未命中 -> 走互斥锁回源
     result = await get_blog_detail_with_mutex(id,db)
     if result == "NONE":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="没有此文章信息")
      #  记录独立访客（HyperLogLog 自动去重）
-    client_ip = request.client.host if request and request.client else "unknown"
     await record_uv(f"uv:blog:{id}", client_ip)
     return success_response(message="获取博客详情成功", data=result)
 
