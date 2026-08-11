@@ -161,8 +161,11 @@ async def redis_isolated():
     import services.redis_lock as redis_lock
     import services.blog_cache as blog_cache
     import services.uv_service as uv_service
+    import services.ratelimit_service as ratelimit_service
     redis_lock.redis_client = client # 让锁也走测试 client (db=1)
+    blog_cache.redis_client = client # 让缓存也走测试 client (db=1) ← 之前漏了这行,是 Windows 假失败根因
     uv_service.redis_client = client # 让 UV 也走测试 client (db=1)
+    ratelimit_service.redis_client = client # 让限流也走测试 client (db=1)
     await client.flushdb()
     yield
     await client.aclose()
