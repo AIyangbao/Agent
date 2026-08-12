@@ -28,4 +28,4 @@ from tools.weather import WeatherTool
 from tools.blog_tools import ListTagsTool, RecentBlogsTool
 ToolRegistry.register(WeatherTool())
 ToolRegistry.register(RecentBlogsTool())
-ToolRegistry.register(RecentBlogsTool())
+ToolRegistry.register(ListTagsTool())
