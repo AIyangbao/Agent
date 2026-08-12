@@ -12,7 +12,7 @@ class ListTagsTool(BaseTool):
         return ToolDefinition(
             name="list_blog_tags",
             description="列出博客现有的所有标签/分类,当用户问“有哪些标签”“有哪些分类”时调用",
-            parameters={"tpye": "object", "properties": {}}, # 无参数
+            parameters={"type": "object", "properties": {}}, # 无参数
         )
 
     async def execute(self, ** kwargs) -> str:
@@ -48,5 +48,5 @@ class RecentBlogsTool(BaseTool):
         for i, b in enumerate(blogs, 1):
             date = b.create_time.strftime("%Y-%m-%d") if b.create_time else "未知日期"
             tags = f"[标签: {','.join(b.tags_name)}]" if b.tags_name else ""
-            lines.append(f"{i}. 《{b.title}》(f{date}{tags})")
+            lines.append(f"{i}. 《{b.title}》({date}{tags})")
         return f"最近发布的{len(blogs)} 篇博客: \n" + "\n".join(lines)
