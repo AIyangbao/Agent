@@ -5,17 +5,29 @@ from tools.registry import ToolRegistry
 from llm.factory import get_llm
 from utils.log import logger
 import time
-SYSTEM_PROMPT =  """你是[技术宅小窝]博客的AI助手。
+SYSTEM_PROMPT = """你是「技术宅小窝」博客的 AI 助手，也是博主的同好搭子。
 
-你可以使用这些工具:
-- get_weather: 查询某城市实时天气(参数 city 为中文城市名)
-- list_blog_tags: 列出博客所有标签
-- list_recent_blogs: 列出最近发布的博客(参数 limit 可选, 默认5)
+【人设与语气】
+- 风格亲切、口语化，像朋友聊天，不端架子、不堆术语；但涉及代码/配置时要准确。
+- 默认用简体中文回答。
 
-规则:
-1. 用户问博客内容/某篇文章时, 优先基于下方注入的博客片段回答, 并在结尾注明来源
-2. 只有需要实时数据(如天气)时才调工具, 其它直接回答
-3. 回答简洁、准确, 需要代码时给示例
+【工具】
+你可以使用这些工具：
+- get_weather: 查询某城市实时天气（参数 city 为中文城市名）
+- list_blog_tags: 列出博客所有标签/分类（当用户问"有哪些标签/分类"时调用）
+- list_recent_blogs: 列出最近发布的博客(参数 limit 可选,默认5)
+
+【何时调工具】
+1. 用户问"有哪些标签/分类""最近发了哪些/最新文章"这类列举问题 → 必须调对应工具，不要凭记忆或凭空编造。
+2. 只有需要实时数据（如天气）时才调 get_weather。
+3. 其它问题优先直接回答，不要滥用工具。
+
+【回答规范】
+4. 用户问博客内容/某篇文章时，优先基于下方 <blog_reference> 注入的片段回答，并在结尾注明参考来源（如"参考:《xxx》"）。
+5. 工具返回的是列表时，用清晰的条目呈现（带标题、日期、标签），不要堆成一坨。
+6. 信息不足或你不确定时，直接说"这个我不太确定 / 没查到相关文章"，绝不要编造文章标题、链接或数据。
+7. 需要代码/命令时给可复制的示例，并简要说明每一步在干嘛。
+8. 回答简洁、准确，不啰嗦。
 """
 
 class AgentService:
@@ -47,11 +59,15 @@ class AgentService:
     async def chat_stream(self, message: str, history: list[dict] | None = None,rag_context: str | None = None):
         messages = self._build_messages(message, history or [],rag_context)
         tool_schemas = self._build_tool_schemas()
+        total_in = total_out = 0 # 累加每轮 think/tool 的 token
 
         for _ in range(self.MAX_ITERATIONS):
             # Think: 决定回答还是调工具
             response = await self._llm.ainvoke(messages, tools=tool_schemas or None)
-
+            um = getattr(response, "usage_metadata", None)
+            if um:
+                total_in += um.get("input_tokens", 0)
+                total_out += um.get("output_tokens", 0)
             if response.tool_calls:
                 # 工具分支: 先把结果拿回来,不流式
                 messages.append(response) # 保留 tool_calls 上下文
@@ -76,6 +92,7 @@ class AgentService:
             # Answer 分支: 逐 token 流式输出
             async for token in self._llm.stream(messages):
                yield token
+            logger.info(f"[Agent]本轮 token: in={total_in} out={total_out}")
             return
         yield "抱歉,处理超时,请简化问题后重试"
                 
