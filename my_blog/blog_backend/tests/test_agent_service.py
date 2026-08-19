@@ -73,3 +73,18 @@ async def test_no_tool_call_for_plain_chat(monkeypatch):
     agent = agent_service.AgentService()
     out = [t async for t in agent.chat_stream("你好", history=[])]
     assert "你好呀" in "".join(out)
+
+async def test_asks_stats_triggers_get_blog_stats(monkeypatch):
+    # 关键: 把工具内部会真连库的函数也 stub 掉(否则 ReAct 会真执行 execute)
+    async def fake_count(db):
+        return 42
+    async def fake_uv(k):
+        return 128
+    monkeypatch.setattr(blog_tools, "get_list_count", fake_count)
+    monkeypatch.setattr(blog_tools, "count_uv", fake_uv)
+    _patch(monkeypatch,
+           plan=[("tool","get_blog_stats",{}), ("answer", "共有42篇,128位访客")],
+           tags=[],blogs=[])
+    agent = agent_service.AgentService()
+    out = [t async for t in agent.chat_stream("我的博客一共多少篇?",history=[])]
+    assert "42" in ".".join(out)

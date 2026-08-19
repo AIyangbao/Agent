@@ -45,3 +45,14 @@ async def test_recent_blogs_limit_clamped(monkeypatch):
     monkeypatch.setattr(blog_tools, "get_blog_list", fake)
     await blog_tools.RecentBlogsTool().execute(limit=9999)
     assert captured["limit"] == 3
+
+async def test_get_blog_stats(monkeypatch):
+    async def fake_count(db):
+        return 42
+    async def fake_uv(k):
+        return 128
+    monkeypatch.setattr(blog_tools, "get_list_count", fake_count)
+    monkeypatch.setattr(blog_tools, "count_uv", fake_uv)
+    agent = blog_tools.BlogStatsTool()
+    res = await agent.execute()
+    assert "篇文章" in res and "128" in res
