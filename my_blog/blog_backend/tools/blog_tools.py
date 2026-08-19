@@ -3,7 +3,8 @@ RAG 擅长"语义搜内容", 但"有哪些标签""最近发了哪些"这类要�
 from tools.base import BaseTool, ToolDefinition
 from config.db_conf import AsyncSessionLocal
 from curd.tags import get_tag_list
-from curd.blogs import get_blog_list
+from curd.blogs import get_blog_list, get_list_count
+from services.uv_service import count_uv
 
 class ListTagsTool(BaseTool):
     """列出博客所有标签"""
@@ -50,3 +51,21 @@ class RecentBlogsTool(BaseTool):
             tags = f"[标签: {','.join(b.tags_name)}]" if b.tags_name else ""
             lines.append(f"{i}. 《{b.title}》({date}{tags})")
         return f"最近发布的{len(blogs)} 篇博客: \n" + "\n".join(lines)
+
+class BlogStatsTool(BaseTool):
+    """博客整体统计：文章总数 + 全站独立访客数(UV)"""
+    SITE_UV_KEY = "uv:site:all" # 全站 UV 基数, 必须在 routers/blogs.py 记录处补 PFADD 才有值
+
+    def definition(self) -> ToolDefinition:
+        return   ToolDefinition(
+            name="get_blog_stats",
+            description="查询博客整体数据: 文章总数、累计独立访客数(UV)。 当用户问“博客一共多少篇”“累计多少人看过”“访问量多少”时调用",
+            parameters={"type": "object", "properties": {}},
+        )
+
+    async def execute(self, **kwargs) -> str:
+        async with AsyncSessionLocal() as db:
+            total = await get_list_count(db) # 不传参 = 全部未删文章
+        uv = await count_uv(self.SITE_UV_KEY)
+        return f"博客共有{total}篇文章, 累计{uv} 位独立访客访问过。"
+        

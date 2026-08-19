@@ -25,7 +25,8 @@ class ToolRegistry:
 
 # ========= 注册所有Tool =========
 from tools.weather import WeatherTool
-from tools.blog_tools import ListTagsTool, RecentBlogsTool
+from tools.blog_tools import ListTagsTool, RecentBlogsTool, BlogStatsTool
 ToolRegistry.register(WeatherTool())
 ToolRegistry.register(RecentBlogsTool())
 ToolRegistry.register(ListTagsTool())
+ToolRegistry.register(BlogStatsTool())
