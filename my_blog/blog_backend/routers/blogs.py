@@ -71,6 +71,7 @@ async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db), 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="没有此文章信息")
     if cached is not None:
         await record_uv(f"uv:blog:{id}", client_ip) # 注意: 命中缓存也要记 UV, 别丢
+        await record_uv(f"uv:site:all", client_ip)
         return success_response(message="获取博客详情成功(缓存)",data=cached)
     # 未命中 -> 走互斥锁回源
     result = await get_blog_detail_with_mutex(id,db)
@@ -78,6 +79,7 @@ async def detail_blog(id: int = Query(...), db: AsyncSession = Depends(get_db), 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="没有此文章信息")
      #  记录独立访客（HyperLogLog 自动去重）
     await record_uv(f"uv:blog:{id}", client_ip)
+    await record_uv("uv:site:all", client_ip)
     return success_response(message="获取博客详情成功", data=result)
 
 
