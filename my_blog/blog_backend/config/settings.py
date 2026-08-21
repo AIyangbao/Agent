@@ -18,13 +18,15 @@ class Settings(BaseSettings):
     JWT_PWD: str = os.getenv("JWT_PWD")
     # Redis
     REDIS_HOST: str = os.getenv("REDIS_HOST","localhost")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT","6379"))
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT","6379")) 
     REDIS_DB: int = int(os.getenv("REDIS_DB","0"))
     # DEBUG
     DEBUG: bool = os.getenv("DEBUG_MODE","False") == "True"
     # AI
     DASHSCOPE_API_KEY: str = os.getenv("DASHSCOPE_API_KEY","")
-    QWEN_MODEL: str = os.getenv("QWEN_MODEL","qwen-plus")
+    DASHSCOPE_BASE_URL: str = os.getenv("DASHSCOPE_BASE_URL",
+    "https://us-ai-proxy9dnddcplgk.cn-beijing.aliyuncs.com/api/v2/apps/protocols/compatible-mode/v1")  # 截图里百炼给的兼容 endpoint
+    QWEN_MODEL: str = os.getenv("QWEN_MODEL","qwen3.8-27b")
     #CORS
     CORS_ORIGINS: list[str] = ["*"]
     # SMS
