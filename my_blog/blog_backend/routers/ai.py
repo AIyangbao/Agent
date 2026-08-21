@@ -20,6 +20,13 @@ async def chat(
 ):
     if await ai_rate_limited(current_user.id):
        return error_response(code=429,message="提问太频繁啦,休息一下再试", data= None)
+
+    # —— 新增：从 DB 读最近对话，作为唯一历史来源 ——
+    rows = await get_history(db, current_user.id, limit=200)
+    db_history = [
+       {"role": r.role, "content": r.content}
+       for r in rows[-10:]
+    ]
     from services.agent_service import AgentService
     agent = AgentService()
     full_reply = []
@@ -37,7 +44,7 @@ async def chat(
 
     async def event_gen():
       try:
-        async for token in agent.chat_stream(req.message, req.history,rag_context=rag_context):
+        async for token in agent.chat_stream(req.message, db_history,rag_context=rag_context, user_id=current_user.id):
            full_reply.append(token)
            yield f"data: {json.dumps({'reply':token},ensure_ascii=False)}\n\n"
       except Exception as e:

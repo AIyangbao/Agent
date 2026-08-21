@@ -19,4 +19,11 @@ async def clear_history(db: AsyncSession, user_id: int):
     for r in rows:
         await db.delete(r)
     await db.commit()
+
+async def get_recent_history(db, user_id, n=10):
+    # 先按 id 倒序取最近 n 条，再反转成升序（符合 _build_messages 期望的正序）
+    stmt = (select(ChatHistory).where(ChatHistory.user_id == user_id)
+            .order_by(ChatHistory.id.desc()).limit(n))
+    rows = (await db.execute(stmt)).scalars().all()
+    return list(reversed(rows))
     

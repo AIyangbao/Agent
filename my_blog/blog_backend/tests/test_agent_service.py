@@ -88,3 +88,34 @@ async def test_asks_stats_triggers_get_blog_stats(monkeypatch):
     agent = agent_service.AgentService()
     out = [t async for t in agent.chat_stream("我的博客一共多少篇?",history=[])]
     assert "42" in ".".join(out)
+
+import asyncio
+async def test_long_memory_saved(monkeypatch):
+    store = {}
+    async def fake_get(k): return store.get(k)
+    async def fake_set(k, v): store[k] = v
+    monkeypatch.setattr(agent_service, "get_cache", fake_get)
+    monkeypatch.setattr(agent_service, "set_cache", fake_set)
+
+    # ① 用 FakeLLM 替换真模型：第一轮直接 answer(无 tool_call)→走 Answer 分支→触发 extract
+    class FakeLLM:
+        async def ainvoke(self, messages, tools=None):
+            return AIMessage(content="好的", tool_calls=[])
+        async def stream(self, messages):
+            yield "好的"
+    monkeypatch.setattr(agent_service, "get_llm", lambda: FakeLLM())
+
+    # ② 捕获 create_task 抛出的后台任务，结束前 await（否则断言时没跑）
+    tasks = []
+    real_ct = asyncio.create_task
+    def spy_create(coro):
+        t = real_ct(coro)
+        tasks.append(t)
+        return t
+    monkeypatch.setattr(asyncio, "create_task", spy_create)
+
+    agent = agent_service.AgentService()
+    out = [t async for t in agent.chat_stream("我喜欢 Python", history=[], user_id=1)]
+    for t in tasks:
+        await t                      # 关键：等后台 extract 跑完
+    assert store.get("memory:1"), "长期记忆应已写入 memory:1"

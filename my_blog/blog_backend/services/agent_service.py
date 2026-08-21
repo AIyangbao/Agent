@@ -4,7 +4,9 @@ from langchain_core.messages import SystemMessage, HumanMessage,AIMessage,ToolMe
 from tools.registry import ToolRegistry
 from llm.factory import get_llm
 from utils.log import logger
+from config.cache_conf import get_cache, set_cache
 import time
+import asyncio
 SYSTEM_PROMPT = """你是「技术宅小窝」博客的 AI 助手，也是博主的同好搭子。
 
 【人设与语气】
@@ -32,6 +34,7 @@ SYSTEM_PROMPT = """你是「技术宅小窝」博客的 AI 助手，也是博主
 8. 回答简洁、准确，不啰嗦。
 """
 
+
 class AgentService:
     """无状态 Agent -- 每次请求创建一个实例"""
 
@@ -58,8 +61,38 @@ class AgentService:
             })
         return schemas
 
-    async def chat_stream(self, message: str, history: list[dict] | None = None,rag_context: str | None = None):
-        messages = self._build_messages(message, history or [],rag_context)
+    async def load_long_memory(self,user_id: int) -> str:
+        return await get_cache(f"memory:{user_id}") or ""
+
+    async def extract_memory(self, user_id: int, turn_text: str):
+        try:
+          # ① 让 LLM 判断这一轮有没有"值得长期记的稳定偏好/事实"
+          judge = await self._llm.ainvoke([HumanMessage(content=(
+          "从对话片段提取用户的稳定偏好或长期事实"
+          "（如技术栈倾向、项目背景、常问话题）。无可记内容只回空字符串。\n"
+          f"对话：{turn_text}"
+          ))])
+          facts = judge.content.strip()
+          if not facts:
+            return
+          # ② 和旧记忆合并去重（避免越存越脏）
+          old = await self.load_long_memory(user_id)
+          if old:
+              merged = await self._llm.ainvoke([HumanMessage(content=(
+                  f"已有长期记忆：\n{old}\n\n新增事实:\n{facts}\n\n合并去重,输出整洁版:"
+              ))])
+              facts = merged.content.strip()
+          # ③ 存回（复用 set_cache，key 跟 load 对应）
+          await set_cache(f"memory:{user_id}", facts)
+        except Exception as e:
+            logger.warning(f"[Agent] 长期记忆抽取失败(已忽略):{e}")
+    
+
+
+
+    async def chat_stream(self, message: str, history: list[dict] | None = None,rag_context: str | None = None, user_id: int | None = None):
+        long_memory = await self.load_long_memory(user_id) if user_id else ""
+        messages = self._build_messages(message, history or [],rag_context, long_memory)
         tool_schemas = self._build_tool_schemas()
         total_in = total_out = 0 # 累加每轮 think/tool 的 token
 
@@ -94,6 +127,8 @@ class AgentService:
             # Answer 分支: 逐 token 流式输出
             async for token in self._llm.stream(messages):
                yield token
+            if user_id:
+                asyncio.create_task(self.extract_memory( user_id, f"用户:{message}"))
             logger.info(f"[Agent]本轮 token: in={total_in} out={total_out}")
             return
         yield "抱歉,处理超时,请简化问题后重试"
@@ -101,8 +136,10 @@ class AgentService:
 
 
     
-    def _build_messages(self,message: str, history: list[dict],rag_context: str | None = None) -> list:
+    def _build_messages(self,message: str, history: list[dict],rag_context: str | None = None, long_memory="") -> list:
         system_content = SYSTEM_PROMPT
+        if long_memory:
+            system_content += f"\n\n 【用户长期偏好】\n{long_memory}\n"
         if rag_context: # 只有检索到内容注入
            system_content += (
                  "\n\n<blog_reference>\n"
