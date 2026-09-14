@@ -1,4 +1,4 @@
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, delete,func
 from models.blogs import Blog
 from models.tags import Blog_tags, tag
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,6 +75,7 @@ async def get_blog_detail(db: AsyncSession, blog_id: int):
         content=blog.content,
         user_id=blog.user_id,
         tags_name=tag_names,
+        create_time=blog.create_time,
     )
     return result
 
@@ -84,33 +85,7 @@ async def add_blog(db: AsyncSession, blog_data: BlogCreate, user_id: int):
     blog = Blog(title=blog_data.title, content=blog_data.content, user_id=user_id)
     db.add(blog)
     await db.flush()
-
-    final_tag_ids = set()
-
-    # 已知 ID： 只保留实际存在的标签
-    if blog_data.tag_ids:
-        res = await db.execute(
-            select(tag.id).where(tag.id.in_(blog_data.tag_ids), tag.is_delete == False)
-        )
-        final_tag_ids.update(r.id for r in res.all())
-
-    # 标签名: 存在则取id, 不存在则新建
-    if blog_data.tag_names:
-        for name in blog_data.tag_names:
-            name = (name or "").strip()
-            if not name:
-                continue
-            res = await db.execute(
-                select(tag).where(tag.name == name, tag.is_delete == False)
-            )
-            existing = res.scalar_one_or_none()
-            if existing:
-                final_tag_ids.add(existing.id)
-            else:
-                new_tag = tag(name=name)
-                db.add(new_tag)
-                await db.flush()
-                final_tag_ids.add(new_tag.id)
+    final_tag_ids = await _resolve_tag_ids(db, tag_ids=blog_data.tag_ids, tag_names=blog_data.tag_names)
 
     for tid in final_tag_ids:
         db.add(Blog_tags(blog_id=blog.id,tag_id=tid))
@@ -129,18 +104,54 @@ async def delete_blog(db: AsyncSession, blog_id: int):
     await db.flush()
     return result
 
+# 标签解析：存在则取 id，不存在则新建（add_blog / update_blog 共用）
+async def _resolve_tag_ids(db: AsyncSession, tag_ids=None, tag_names=None) -> set[int]:
+    final_tag_ids = set()
+    if tag_ids:
+        res = await db.execute(
+            select(tag.id).where(tag.id.in_(tag_ids), tag.is_delete == False)
+        )
+        final_tag_ids.update(r.id for r in res.all())
+
+    if tag_names:
+        for name in tag_names:
+            name = (name or "").strip()
+            if not name:
+                continue
+            res = await db.execute(
+                select(tag).where(tag.name == name, tag.is_delete == False)
+            )
+            existing =  res.scalar_one_or_none()
+            if existing:
+                final_tag_ids.add(existing.id)
+            else:
+                new_tag = tag(name=name)
+                db.add(new_tag)
+                await db.flush()
+                final_tag_ids.add(new_tag.id)
+    return final_tag_ids
 
 # 修改博客
 async def update_blog(db: AsyncSession, blog_id: int, blog_data: BlogUpdate):
-    query = (
-        update(Blog)
-        .where(Blog.id == blog_id)
-        .values(**blog_data.model_dump(exclude_unset=True, exclude_none=True))
-    )
-    result = await db.execute(query)
-    # 检查更新
-    if result.rowcount == 0:
-        return None
+    data = blog_data.model_dump(exclude_unset=True, exclude_none=True)
+    tag_ids = data.pop("tag_ids",None)
+    tag_names = data.pop("tag_names", None)
+    if data:
+        result = await db.execute(update(Blog).where(Blog.id == blog_id, Blog.is_delete == False).values(**data))
+        # 检查更新
+        if result.rowcount == 0:
+          return None
+
+    if tag_ids is not None or tag_names is not None:
+        # 解析标签，获取最终有效的标签ID集合
+        final_tag_ids = await _resolve_tag_ids(db, tag_ids=tag_ids, tag_names=tag_names)
+        await db.execute(delete(Blog_tags).where(Blog_tags.blog_id == blog_id))
+        # 插新关联
+        for tid in final_tag_ids:
+            db.add(Blog_tags(blog_id=blog_id, tag_id=tid))
+        await db.flush()
     # 获取一下更新后的博客
     updated_blog = await get_blog_detail(db, blog_id)
     return updated_blog
+
+

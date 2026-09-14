@@ -11,9 +11,10 @@ class BlogCreate(BaseModel):
 
 
 class BlogUpdate(BaseModel):
-    title: Optional[str] = Field(..., min_length=1, max_length=200, description="标题")
-    content: Optional[str] = Field(..., min_length=1, max_length=50000, description="内容")
-
+    title: str = Field(..., min_length=1, max_length=200, description="标题")
+    content: str = Field(..., min_length=1, max_length=50000, description="内容")
+    tag_ids: Optional[List[int]] = None
+    tag_names: Optional[List[str]] = None
 
 class BlogResponse(BaseModel):
     id: int

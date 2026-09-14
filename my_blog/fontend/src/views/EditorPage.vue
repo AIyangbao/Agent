@@ -2,11 +2,11 @@
   <div class="page">
     <div class="write-wrap">
       <div class="editor-header">
-        <h2>✍️ 写新文章</h2>
+        <h2>{{ isEdit ? '✏️ 编辑文章' : '✍️ 写新文章' }}</h2>
         <div class="editor-actions">
-          <button class="btn-outline" @click="$router.push('/posts')">取消</button>
+          <button class="btn-outline" @click="cancelEdit">取消</button>
           <button class="btn-primary" :disabled="isPublishing" @click="publish">
-            {{ isPublishing ? '发布中...' : '发布' }}
+            {{ isPublishing ? (isEdit ? '保存中...' : '发布中...') : (isEdit ? '保存修改' : '发布') }}
           </button>
         </div>
       </div>
@@ -14,6 +14,8 @@
       <div class="editor-card">
         <input type="text" class="editor-title" v-model="title" placeholder="文章标题...">
 
+        <!-- 标签统一以 tag_names 提交：后端 add_blog / update_blog 会「存在则取 id，不存在则新建」，
+             所以自定义标签（不在下方下拉框里的）也能真正落库 -->
         <div class="editor-meta-row">
           <select v-model="tag">
             <option value="">选择标签</option>
@@ -50,16 +52,21 @@
 </template>
 
 <script setup>
-import { ref, inject } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, inject, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../store'
-import { createPost } from '../api/posts'
+import { createPost, updatePost, fetchPostById } from '../api/posts'
 
+const route = useRoute()
 const router = useRouter()
 const toast = inject('toast')
 const user = useUserStore()
 
-// 标签名 → 标签ID 映射（需与数据库 tag 表一致，后续可改为接口获取）
+// 编辑模式：/write?edit=<文章id>。route.path 仍是 /write，HomePage 的 isEditorPage 判断不受影响
+const editId = computed(() => (route.query.edit ? Number(route.query.edit) : null))
+const isEdit = computed(() => editId.value != null)
+
+// 下拉框里的标签名集合，用于回填时判断"这个标签名能不能塞进下拉框"
 const TAG_MAP = { 'Python': 1, 'AI': 2, 'Vue': 3, 'FastAPI': 4, 'Docker': 5 }
 
 const title = ref('')
@@ -68,6 +75,7 @@ const tag = ref('')
 const extraTags = ref('')
 const editorRef = ref(null)
 const isPublishing = ref(false)
+const isLoaded = ref(false) // 编辑模式：原文是否已回填（防止"保存修改"在回填前误触发空内容覆盖）
 
 function insert(before, after) {
   const ta = editorRef.value
@@ -86,28 +94,66 @@ function insert(before, after) {
   }, 0)
 }
 
+// 收集标签名：下拉框 + 自定义输入，去重（提交时统一以 tag_names 交给后端解析）
+function collectTagNames() {
+  const names = []
+  if (tag.value) names.push(tag.value)
+  extraTags.value.split(',').forEach(s => {
+    const t = s.trim()
+    if (t) names.push(t)
+  })
+  return [...new Set(names)]
+}
+
+// 编辑模式：进入页面先拉原文回填（标题/正文/标签）
+onMounted(async () => {
+  if (!isEdit.value) return
+  try {
+    const data = await fetchPostById(editId.value)
+    title.value = data.title || ''
+    content.value = data.content || ''
+    // 原文标签回显：第一个在下拉框里的放 select，其余（含自定义标签）放文本框，保证保存时不丢标签
+    const names = Array.isArray(data.tags_name) ? data.tags_name : []
+    const inSelect = names.find(n => TAG_MAP[n] != null)
+    tag.value = inSelect || ''
+    extraTags.value = names.filter(n => n !== inSelect).join(', ')
+    isLoaded.value = true
+  } catch (e) {
+    toast(e.message || '文章加载失败', 'error')
+    router.push('/posts')
+  }
+})
+
+function cancelEdit() {
+  // 编辑模式取消 → 回到文章详情；新建模式取消 → 回文章列表
+  router.push(isEdit.value ? `/posts/${editId.value}` : '/posts')
+}
+
 async function publish() {
   const t = title.value.trim()
   const c = content.value.trim()
   if (!t) { toast('文章标题不能为空', 'error'); return }
   if (!c) { toast('文章内容不能为空', 'error'); return }
-
-  const tags = []
-  if (tag.value) tags.push(tag.value)
-  extraTags.value.split(',').forEach(t => {
-    const tt = t.trim()
-    if (tt) tags.push(tt)
-  })
+  if (isEdit.value && !isLoaded.value) { toast('原文还没加载完，稍等一下', 'error'); return }
 
   isPublishing.value = true
   try {
-    // 将标签名转换为标签ID
-    const tagIds = tags.map(t => TAG_MAP[t]).filter(id => id != null)
-    await createPost({ title: t, content: c, tag_ids: tagIds })
+    const names = collectTagNames()
+
+    if (isEdit.value) {
+      // 编辑：标题/正文/标签一起提交
+      // RAG 向量由后端 update_blog_with_rag 自动 upsert，前端不用管
+      await updatePost(editId.value, { title: t, content: c, tag_names: names })
+      toast('文章已保存 ✅', 'success')
+      router.push(`/posts/${editId.value}`)
+      return
+    }
+
+    await createPost({ title: t, content: c, tag_names: names })
     toast('文章发布成功 🎉', 'success')
     router.push('/posts')
   } catch (e) {
-    toast(e.message || '发布失败', 'error')
+    toast(e.message || (isEdit.value ? '保存失败' : '发布失败'), 'error')
   } finally {
     isPublishing.value = false
   }

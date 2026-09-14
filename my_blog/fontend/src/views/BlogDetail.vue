@@ -38,7 +38,8 @@
           </header>
           <div class="da-body" v-html="renderedContent"></div>
 
-          <footer class="da-footer" v-if="isLoggedIn">
+          <footer class="da-footer" v-if="isOwner">
+            <button class="btn-edit" @click="router.push(`/write?edit=${id}`)">编辑文章</button>
             <button class="btn-delete" @click="handleDelete">删除此文章</button>
           </footer>
         </article>
@@ -66,6 +67,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchPostById, deletePost } from '../api/posts'
+import { getMe } from '../api/auth'
 import { useUserStore } from '../store'
 import CommentSection from '../components/CommentSection.vue'
 import { renderMarkdown } from '../utils/markdown.js'
@@ -75,6 +77,12 @@ const router = useRouter()
 const user = useUserStore()
 const id = route.params.id
 const isLoggedIn = computed(() => user.isLoggedIn)
+// 作者本人才能看到编辑/删除按钮。
+// 之前这里只判 isLoggedIn，任何登录用户都会看到"删除此文章"——
+// 真正的拦截靠后端 403 兜底，UI 上属于误展示，现按 user_id 收紧。
+const isOwner = computed(() =>
+  !!user.userId && !!post.value && post.value.user_id === user.userId
+)
 const post = ref(null)
 const renderedContent = ref('')
 
@@ -100,7 +108,14 @@ function handleDelete() {
   deletePost(id).then(() => router.push('/')).catch(() => alert('删除失败'))
 }
 
-onMounted(loadDetail)
+onMounted(async () => {
+  // 兼容改版前已登录的旧会话：localStorage 里还没有 userId，补拉一次 /me 记录下来，
+  // 否则作者本人看不到「编辑/删除」按钮（拉不到就静默降级为普通读者视角）
+  if (user.isLoggedIn && !user.userId) {
+    try { user.setUserId((await getMe()).id) } catch (e) { /* 静默 */ }
+  }
+  await loadDetail()
+})
 </script>
 
 <style scoped>
@@ -185,7 +200,14 @@ onMounted(loadDetail)
 .da-body :deep(a) { color: var(--primary); text-decoration: none; }
 .da-body :deep(a:hover) { text-decoration: underline; }
 
-.da-footer { padding: 1.2rem 2rem; border-top: 1px solid var(--border-strong); display: flex; justify-content: flex-end; }
+.da-footer { padding: 1.2rem 2rem; border-top: 1px solid var(--border-strong); display: flex; justify-content: flex-end; gap: 0.6rem; }
+.btn-edit {
+  padding: 0.5rem 1.3rem; border-radius: 10px;
+  background: var(--primary-bg); color: var(--primary-dark);
+  border: 1px solid var(--primary); border-radius: 10px;
+  font-size: 13px; cursor: pointer; transition: all 0.2s;
+}
+.btn-edit:hover { background: var(--primary); color: #fff; }
 .btn-delete {
   padding: 0.5rem 1.3rem; border-radius: 10px;
   background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;

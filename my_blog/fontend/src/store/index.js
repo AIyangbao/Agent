@@ -7,6 +7,7 @@ export const useUserStore = defineStore('user', () => {
   const nickname = ref(null)
   const avatar = ref(null)
   const token = ref(null)
+  const userId = ref(null)
 
   const isLoggedIn = computed(() => !!username.value)
   const initial = computed(() => (nickname.value || username.value) ? (nickname.value || username.value)[0].toUpperCase() : '')
@@ -21,6 +22,7 @@ export const useUserStore = defineStore('user', () => {
     try {
       const data = await getMe()
       setProfile({ nickname: data.nickname, avatar: data.avatar })
+      setUserId(data.id)
     } catch (e) {
       // 拉取失败不影响登录流程，进入个人中心会再次拉取
     }
@@ -31,10 +33,12 @@ export const useUserStore = defineStore('user', () => {
     nickname.value = null
     avatar.value = null
     token.value = null
+    userId.value = null
     localStorage.removeItem('blog_user')
     localStorage.removeItem('blog_nickname')
     localStorage.removeItem('blog_avatar')
     localStorage.removeItem('blog_token')
+    localStorage.removeItem('blog_user_id')
   }
 
   function restore() {
@@ -46,6 +50,15 @@ export const useUserStore = defineStore('user', () => {
     if (savedAvatar) avatar.value = savedAvatar
     const savedToken = localStorage.getItem('blog_token')
     if (savedToken) token.value = savedToken
+    const savedId = localStorage.getItem('blog_user_id')
+    if (savedId) userId.value = Number(savedId)
+  }
+
+  // 记录当前用户 id：文章详情页靠它判断「这篇文章是不是我写的」→ 显示编辑/删除按钮
+  function setUserId(id) {
+    userId.value = id ?? null
+    if (id != null) localStorage.setItem('blog_user_id', String(id))
+    else localStorage.removeItem('blog_user_id')
   }
 
   function setAvatar(dataUrl) {
@@ -65,5 +78,5 @@ export const useUserStore = defineStore('user', () => {
     if (av !== undefined) setAvatar(av)
   }
 
-  return { username, nickname, avatar, token, isLoggedIn, initial, displayName, login, logout, restore, setAvatar, setProfile }
+  return { username, nickname, avatar, token, userId, isLoggedIn, initial, displayName, login, logout, restore, setAvatar, setProfile, setUserId }
 })
