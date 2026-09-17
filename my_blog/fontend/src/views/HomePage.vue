@@ -210,7 +210,7 @@
             <div class="detail-meta-row">
               <span class="dm-item">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dm-icon"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                {{ detailPost.date || '未知日期' }}
+                {{ formatDateTime(detailPost.date) || '未知日期' }}
               </span>
               <span class="dm-sep">|</span>
               <span class="dm-item">
@@ -232,8 +232,9 @@
             <!-- Markdown 正文 -->
             <article class="detail-body card" ref="detailBodyRef" v-html="renderedContent"></article>
 
-            <!-- 删除按钮 -->
-            <div class="-detail-actions" v-if="isLoggedIn">
+            <!-- 作者操作：编辑 / 删除（仅文章作者可见，isOwner 见 script） -->
+            <div class="-detail-actions" v-if="isOwner">
+              <button class="btn-edit" @click="$router.push(`/write?edit=${detailPost.id}`)">编辑文章</button>
               <button class="btn-delete" @click="handleDeleteDetail">删除此文章</button>
             </div>
 
@@ -453,14 +454,14 @@
 
           <!-- 编辑器卡片 -->
           <div class="editor-wrap card">
-            <!-- 标题栏：写新文章 + 取消/发布按钮 -->
+            <!-- 标题栏：写新文章/编辑文章 + 取消/发布按钮 -->
             <div class="editor-header-row">
-              <h2 class="editor-heading">写新文章</h2>
+              <h2 class="editor-heading">{{ editingId ? '✏️ 编辑文章' : '写新文章' }}</h2>
               <div class="editor-actions-row">
-                <span v-if="draftSavedAt" class="draft-tip">已自动保存 {{ draftSavedAt ? formatDraftTime(draftSavedAt) : '' }}</span>
-                <button class="btn-editor btn-editor-outline" @click="$router.push('/')">取消</button>
+                <span v-if="draftSavedAt && !editingId" class="draft-tip">已自动保存 {{ draftSavedAt ? formatDraftTime(draftSavedAt) : '' }}</span>
+                <button class="btn-editor btn-editor-outline" @click="cancelEditor">取消</button>
                 <button class="btn-editor btn-editor-primary" @click="editorPublish" :disabled="editorPublishing">
-                  {{ editorPublishing ? '发布中...' : '发布' }}
+                  {{ editorPublishing ? (editingId ? '保存中...' : '发布中...') : (editingId ? '保存修改' : '发布') }}
                 </button>
               </div>
             </div>
@@ -1079,19 +1080,28 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, reactive, nextTick, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchPosts, fetchPostById, deletePost, createPost, uploadImage } from '../api/posts'
+import { fetchPosts, fetchPostById, deletePost, createPost, updatePost, uploadImage } from '../api/posts'
 import { chatWithAIStream, fetchAIHistory, clearAIHistory } from '../api/ai'
 import { apiUrl } from '../config'
 import { useUserStore } from '../store'
 import CommentSection from '../components/CommentSection.vue'
 import { renderMarkdown, enhanceCodeBlocks, enhanceImages, extractToc } from '../utils/markdown.js'
 import { setMeta, resetMeta } from '../utils/meta.js'
+import { getMe } from '../api/auth'
 
 const route = useRoute()
 const $router = useRouter()
 const toast = inject('toast')
 const user = useUserStore()
 const isLoggedIn = computed(() => user.isLoggedIn)
+
+// 文章作者本人才能看到「编辑/删除」按钮（详情页动作区）。
+// 只判 isLoggedIn 的话，任何登录用户都会看到别人文章下的删除按钮——
+// 真拦截靠后端 403 兜底，UI 上按 user_id 收紧。
+const isOwner = computed(() =>
+  !!user.userId && !!detailPost.value &&
+  Number(detailPost.value.user_id) === Number(user.userId)
+)
 
 // 数据
 const totalPosts = ref(0)
@@ -1312,6 +1322,8 @@ const isCategoryPage = computed(() => route.path === '/category')
 const isTagsPage = computed(() => route.path === '/tags' || !!route.query.tag)
 const isAIPage = computed(() => route.path === '/ai')
 const isEditorPage = computed(() => route.path === '/write')
+// 编辑模式：/write?edit=<文章id>，同一个编辑器复用为「修改已发布文章」
+const editingId = computed(() => (route.query.edit ? Number(route.query.edit) : null))
 const isDetailPage = computed(() => !!route.params.id && !route.query.tag)
 
 // 路由视图切换 key：用于触发中间内容区过渡动画。
@@ -1325,12 +1337,18 @@ const viewKey = computed(() => {
   if (isTagsPage.value) return route.query.tag ? 'tag-' + route.query.tag : 'tags'
   return 'home'
 })
-// 进入写文章页时尝试恢复上次未发布的草稿
+// 进入写文章页：编辑模式回填原文，新建模式恢复草稿
+// （enterEditor 由 watch + onMounted 双入口调用，保证刷新直达 /write 也生效）
 watch(isEditorPage, (val) => {
-  if (val) restoreDraft()
+  if (val) enterEditor()
 })
+
+function enterEditor() {
+  if (editingId.value) loadOriginalForEdit()
+  else restoreDraft()
+}
 const heroTitle = computed(() => {
-  if (isEditorPage.value) return '写新文章'
+  if (isEditorPage.value) return editingId.value ? '编辑文章' : '写新文章'
   if (isDetailPage.value) return detailPost.value?.title || '文章详情'
   if (isAIPage.value) return 'AI 对话助手'
   if (isCategoryPage.value) return '分类'
@@ -1520,13 +1538,59 @@ function aiClearChat() {
 }
 
 // ========== 写文章编辑器 ==========
-const TAG_MAP = { 'Python': 1, 'AI': 2, 'Vue': 3, 'FastAPI': 4, 'Docker': 5 }
+// （旧 TAG_MAP 名称→id 硬编码映射已删：标签统一走 tag_names 由后端解析）
 const editorTitle = ref('')
 const editorContent = ref('')
 const editorTag = ref('')
 const editorExtraTags = ref('')
 const editorRef = ref(null)
 const editorPublishing = ref(false)
+const editLoaded = ref(false) // 编辑模式：原文是否已回填（防止"保存修改"在回填前误触发空内容覆盖）
+
+// ====== 编辑模式：进入 /write?edit=<id> 时拉原文回填 ======
+async function loadOriginalForEdit() {
+  if (!editingId.value) return
+  editLoaded.value = false
+  try {
+    const data = await fetchPostById(editingId.value)
+    const blog = data.Blog || data
+    editorTitle.value = blog.title || ''
+    editorContent.value = blog.content || ''
+    // 原文标签回显：第一个在下拉框里的放 select，其余（含自定义标签）放文本框，保证保存时不丢标签
+    const names = Array.isArray(data.tags_name) ? data.tags_name : []
+    const inSelect = names.find(n => PREDEFINED_TAGS.includes(n))
+    editorTag.value = inSelect || ''
+    editorExtraTags.value = names.filter(n => n !== inSelect).join(', ')
+    editLoaded.value = true
+  } catch (e) {
+    toast(e.message || '文章加载失败', 'error')
+    $router.push('/')
+  }
+}
+
+// 收集标签名：下拉框 + 自定义输入，去重（统一以 tag_names 提交，
+// 后端「存在则取 id，不存在则新建」——自定义标签不再被 TAG_MAP 静默过滤）
+function collectEditorTagNames() {
+  const names = []
+  if (editorTag.value) names.push(editorTag.value)
+  editorExtraTags.value.split(',').forEach(s => {
+    const tt = s.trim()
+    if (tt) names.push(tt)
+  })
+  return [...new Set(names)]
+}
+
+// 取消：编辑模式回文章详情，新建模式回首页。
+// 无论哪种模式都清空编辑器——否则编辑半途回退，残留内容会漏进下一次"写新文章"
+function cancelEditor() {
+  editorTitle.value = ''
+  editorContent.value = ''
+  editorTag.value = ''
+  editorExtraTags.value = ''
+  editLoaded.value = false
+  $router.push(editingId.value ? `/posts/${editingId.value}` : '/')
+}
+
 const imageInputRef = ref(null)
 const uploadingImage = ref(false)
 const uploadProgress = ref(0)
@@ -1580,9 +1644,11 @@ function clearDraft() {
   draftSavedAt.value = 0
 }
 
-// 编辑时自动存草稿（防抖 800ms）
+// 编辑时自动存草稿（防抖 800ms）。编辑模式下不存草稿——草稿是"新建"的安全网，
+// 不能用半成品编辑内容覆盖掉新建草稿
 let draftTimer = null
 function onEditorInput() {
+  if (editingId.value) return
   if (draftTimer) clearTimeout(draftTimer)
   draftTimer = setTimeout(saveDraft, 800)
 }
@@ -1660,17 +1726,27 @@ async function editorPublish() {
   const c = editorContent.value.trim()
   if (!t) { window.alert('文章标题不能为空'); return }
   if (!c) { window.alert('文章内容不能为空'); return }
+  if (editingId.value && !editLoaded.value) { window.alert('原文还没加载完，稍等一下'); return }
 
-  const tags = []
-  if (editorTag.value) tags.push(editorTag.value)
-  editorExtraTags.value.split(',').forEach(t => {
-    const tt = t.trim(); if (tt) tags.push(tt)
-  })
+  const names = collectEditorTagNames()
 
   try {
     editorPublishing.value = true
-    const tagIds = tags.map(t => TAG_MAP[t]).filter(id => id != null)
-    await createPost({ title: t, content: c, user_id: 1, tag_ids: tagIds })
+
+    // 编辑分支：标题/正文/标签一起提交；RAG 向量由后端 update_blog_with_rag 自动 upsert
+    if (editingId.value) {
+      await updatePost(editingId.value, { title: t, content: c, tag_names: names })
+      editorTitle.value = ''
+      editorContent.value = ''
+      editorTag.value = ''
+      editorExtraTags.value = ''
+      editLoaded.value = false
+      toast('文章已保存 ✅', 'success')
+      $router.push(`/posts/${editingId.value}`)
+      return
+    }
+
+    await createPost({ title: t, content: c, user_id: 1, tag_names: names })
     editorTitle.value = ''
     editorContent.value = ''
     editorTag.value = ''
@@ -1680,7 +1756,7 @@ async function editorPublish() {
     alert('文章发布成功 🎉')
     setTimeout(() => $router.push('/'), 600)
   } catch (e) {
-    alert(e.message || '发布失败')
+    alert(e.message || (editingId.value ? '保存失败' : '发布失败'))
   } finally {
     editorPublishing.value = false
   }
@@ -2005,15 +2081,30 @@ async function loadData() {
 }
 
 // 加载文章详情
+// 后端返回 ISO 字符串（2026-08-04T00:01:07），格式化成「2026-08-04 00:01」再展示
+function formatDateTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 async function loadDetail() {
   const id = route.params.id
   if (!id) return
   detailLoading.value = true
   try {
+    // 兼容改版前已登录的旧会话：localStorage 里还没有 userId，补拉一次 /me，
+    // 否则作者本人看不到「编辑/删除」按钮（拉不到就静默降级为普通读者视角）
+    if (user.isLoggedIn && !user.userId) {
+      try { user.setUserId((await getMe()).id) } catch (e) { /* 静默 */ }
+    }
     const data = await fetchPostById(id)
     const blog = data.Blog || data
     detailPost.value = {
       id: blog.id,
+      user_id: blog.user_id,   // 作者判断用：isOwner 需要
       title: blog.title,
       content: blog.content || '',
       date: blog.create_time || blog.created_at || blog.updated_at || '',
@@ -2153,6 +2244,7 @@ async function fetchMusicList() {
 onMounted(() => {
   loadData()
   if (isDetailPage.value) loadDetail()
+  if (isEditorPage.value) enterEditor()   // 刷新直达 /write 时 watch 不会触发，这里兜底
   fetchMusicList()
   loadAIHistory()
   document.addEventListener('click', onDocClickClosePostMenu)
@@ -3569,10 +3661,17 @@ html[data-theme='dark'] .tl-post-item:hover { background: rgba(16,185,129,0.12);
 .related-tag { font-size: 11px; color: var(--primary); background: var(--primary-bg); padding: 0.15rem 0.55rem; border-radius: 10px; }
 .related-card-excerpt { font-size: 12px; color: var(--text-dim); line-height: 1.7; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* 删除按钮 */
+/* 详情页作者操作区：编辑 + 删除 */
 .-detail-actions {
-  display: flex; justify-content: flex-end; padding: 0.5rem 0.2rem;
+  display: flex; justify-content: flex-end; gap: 0.6rem; padding: 0.5rem 0.2rem;
 }
+.btn-edit {
+  padding: 0.5rem 1.3rem; border-radius: 10px;
+  background: var(--primary-bg); color: var(--primary-dark);
+  border: 1px solid var(--primary); font-size: 13px; cursor: pointer;
+  transition: all 0.2s; font-weight: 500;
+}
+.btn-edit:hover { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,0.25); }
 .btn-delete {
   padding: 0.5rem 1.3rem; border-radius: 10px;
   background: #fef2f2; color: #dc2626;
@@ -3584,6 +3683,9 @@ html[data-theme='dark'] .tl-post-item:hover { background: rgba(16,185,129,0.12);
 /* 详情暗色模式 */
 html[data-theme='dark'] .detail-body :deep(:not(pre) > code) {
   background: rgba(51,65,85,0.5); color: #fca5a5;
+}
+html[data-theme='dark'] .btn-edit {
+  background: rgba(16,185,129,0.12); color: var(--primary);
 }
 html[data-theme='dark'] .btn-delete {
   background: rgba(127,29,29,0.3); border-color: rgba(220,38,38,0.3);
