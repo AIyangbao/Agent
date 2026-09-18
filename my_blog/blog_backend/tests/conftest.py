@@ -135,10 +135,11 @@ async def auth_client_b(client):
          yield c
 
 import redis.asyncio as aioredis
-
+from curd.blogs import get_blog_detail as _detail_from_db
 # 6. Redis 客户端隔离（解决 pytest-asyncio 每测试新建 event loop 导致
 #    cache_conf.redis_client 单例绑定旧 loop 报 'Event loop is closed'）
 #    用独立测试 DB(db=1)，不碰你本机 db=0 的真实缓存
+import routers.blogs as _blogs_router
 @pytest_asyncio.fixture(autouse=True)
 async def redis_isolated():
     client = aioredis.Redis(
@@ -152,36 +153,48 @@ async def redis_isolated():
     )
     import config.cache_conf as cache_conf
     try:
-        await asyncio.wait_for(client.ping(), timeout=3)  
+        await asyncio.wait_for(client.ping(), timeout=3)
     except Exception:
         cache_conf.redis_client = None # ← Redis 没跑，缓存层整体降级为 no-op
-        yield
-        return
-    cache_conf.redis_client = client   # 覆盖模块级单例，路由/服务层统一走新客户端
-    import services.redis_lock as redis_lock
-    import services.blog_cache as blog_cache
-    import services.uv_service as uv_service
-    import services.ratelimit_service as ratelimit_service
-    redis_lock.redis_client = client # 让锁也走测试 client (db=1)
-    blog_cache.redis_client = client # 让缓存也走测试 client (db=1) ← 之前漏了这行,是 Windows 假失败根因
-    uv_service.redis_client = client # 让 UV 也走测试 client (db=1)
-    ratelimit_service.redis_client = client # 让限流也走测试 client (db=1)
-    await client.flushdb()
-    yield
-    await client.aclose()
+    # --- 在这行下面补：把路由层持有的旧引用也换掉 ---
+    class _NoLockCtx:
+        def __init__(self, *a, **kw):
+            pass
+        async def __aenter__(self):
+            return object()
+        async def __aexit__(self, *exc):
+            return False
+    async def _noop(*a, **kw): return None
+    async def _noop_int(*a, **kw): return 0
 
-import pytest_asyncio
-from curd.blogs import add_blog, get_blog_detail
+    # 先存原引用，测完恢复，不污染同进程里 redis 存活时的其他测试
+    _orig = (_blogs_router.RedisLockCtx,_blogs_router.record_uv,_blogs_router.count_uv)
+    _blogs_router.RedisLockCtx = _NoLockCtx
+    _blogs_router.record_uv = _noop
+    _blogs_router.count_uv = _noop_int
+    import pytest_asyncio
+    async def _detail_no_cache(blog_id, db):
+      return await _detail_from_db(db, blog_id)
+    _orig_detail = _blogs_router.get_blog_detail_with_mutex
+    _blogs_router.get_blog_detail_with_mutex = _detail_no_cache
+    yield
+    #--- 恢复 ---
+    _blogs_router.RedisLockCtx, _blogs_router.record_uv, _blogs_router.count_uv = _orig
+    _blogs_router.get_blog_detail_with_mutex = _orig_detail
 import routers.blogs as blogs_router
 import services.blog_rag as blog_rag
-
+from curd.blogs import add_blog,get_blog_detail
 @pytest_asyncio.fixture(autouse=True)
 async def dsiable_rag_in_test():
     """测试环境禁用RAG入库, 避免真是打 DashScope embedding(慢且花钱)."""
     async def _fake_create(db,blog, user_id, background_tasks=None):
-        post = await add_blog(db, blog, user_id)
-        return await get_blog_detail(db, post.id)
+        post = await blogs_router.add_blog(db, blog, user_id)
+        return await blogs_router.get_blog_detail(db, post.id)
+    from curd.blogs import update_blog
     async def _fake_update(db,blog_id, blog):
+        result = await update_blog(db, blog_id, blog)
+        if result is None:
+            return None
         return await get_blog_detail(db, blog_id)
     # 路由用的是直接 import 的名字，必须 patch 到 routers.blogs 上
     orig_c = blogs_router.create_blog_with_rag
