@@ -92,7 +92,7 @@ async def add(
     db: AsyncSession = Depends(get_db),
 ):
     # 按用户加锁：防同一用户并发重复提交（前端连点 / 网络重试）
-    async with RedisLockCtx(f"add_blog:{current_user.id}", expire=10) as lock:
+    async with RedisLockCtx(f"add_blog:{current_user.id}", expire=10,retry=1) as lock:
         if lock is None: # 没拿到锁 = 别人正在发，直接拒
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

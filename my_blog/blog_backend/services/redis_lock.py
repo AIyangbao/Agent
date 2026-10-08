@@ -22,12 +22,13 @@ class RedisLock:
 
 
     async def acquire(self) -> bool:
-        for _ in range(self.retry):
+        for i in range(self.retry):
             ok = await redis_client.set(self.name, self.token, nx=True, ex=self.expire)
             if ok:
                self._start_watchdog()
                return True
-            await asyncio.sleep(self.retry_delay)
+            if i < self.retry - 1:
+               await asyncio.sleep(self.retry_delay)
         return False
 
     def _start_watchdog(self):
